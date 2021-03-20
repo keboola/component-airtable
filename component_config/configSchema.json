@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "title": "extractor configuration",
+  "required": [
+    "print_hello"
+  ],
+  "properties": {
+    "print_hello": {
+      "type": "string",
+      "title": "Debug"
+    },
+    "debug": {
+      "type": "string",
+      "title": "Debug"
+    }
+  }
+}
