@@ -1,1 +1,1 @@
-Testing functional sample extractor for purposes of the python component template. 
+First draft of Airtable extractor.

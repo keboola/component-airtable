@@ -1,94 +1,92 @@
-'''
-Template Component main class.
-
-'''
 import logging
-import os
-from pathlib import Path
+from typing import Dict, List, Optional
 
-from keboola.component import CommonInterface
+from keboola.component import ComponentBase
+from keboola.component.exceptions import UserException
+from keboola.utils.header_normalizer import DefaultHeaderNormalizer
+
+from pyairtable import Table
+
+from csv_tools import CachedOrthogonalDictWriter
 
 # configuration variables
-KEY_API_TOKEN = '#api_token'
-KEY_PRINT_HELLO = 'print_hello'
-
-# #### Keep for debug
-KEY_DEBUG = 'debug'
+KEY_API_KEY = "#api_key"
+KEY_BASE_ID = "base_id"
+KEY_TABLE_NAME = "table_name"
+KEY_FILTER_BY_FORMULA = "filter_by_formula"
+KEY_FIELDS = "fields"
+KEY_INCREMENTAL_LOADING = "incremental_loading"
 
 # list of mandatory parameters => if some is missing,
 # component will fail with readable message on initialization.
-REQUIRED_PARAMETERS = [KEY_PRINT_HELLO]
+REQUIRED_PARAMETERS = [KEY_API_KEY, KEY_BASE_ID, KEY_TABLE_NAME]
 REQUIRED_IMAGE_PARS = []
 
-APP_VERSION = '0.0.1'
+RECORD_ID_FIELD_NAME = 'record_id'
+RECORD_CREATED_TIME_FIELD_NAME = 'record_created_time'
 
 
-def get_local_data_path():
-    return Path(__file__).resolve().parent.parent.joinpath('data').as_posix()
+def process_record(record: Dict) -> Dict:
+    output_record = {RECORD_ID_FIELD_NAME: record['id'],
+                     **record['fields'],
+                     RECORD_CREATED_TIME_FIELD_NAME: record['createdTime']}
+    return output_record
 
 
-def get_data_folder_path():
-    data_folder_path = None
-    if not os.environ.get('KBC_DATADIR'):
-        data_folder_path = get_local_data_path()
-    return data_folder_path
+class Component(ComponentBase):
+    """
+        Extends base class for general Python components. Initializes the CommonInterface
+        and performs configuration validation.
 
+        For easier debugging the data folder is picked up by default from `../data` path,
+        relative to working directory.
 
-class Component(CommonInterface):
+        If `debug` parameter is present in the `config.json`, the default logger is set to verbose DEBUG mode.
+    """
+
     def __init__(self):
-        # for easier local project setup
-        data_folder_path = get_data_folder_path()
-        super().__init__(data_folder_path=data_folder_path)
-
-        try:
-            # validation of required parameters. Produces ValueError
-            self.validate_configuration(REQUIRED_PARAMETERS)
-            self.validate_image_parameters(REQUIRED_IMAGE_PARS)
-        except ValueError as e:
-            logging.exception(e)
-            exit(1)
-
-        if self.configuration.parameters.get(KEY_DEBUG):
-            self.set_debug_mode()
-
-    @staticmethod
-    def set_debug_mode():
-        logging.getLogger().setLevel(logging.DEBUG)
-        logging.info('Running version %s', APP_VERSION)
-        logging.info('Loading configuration...')
+        super().__init__()
+        # Check for missing configuration parameters
+        self.validate_configuration_parameters(REQUIRED_PARAMETERS)
+        self.validate_image_parameters(REQUIRED_IMAGE_PARS)
 
     def run(self):
         '''
         Main execution code
         '''
-        # ####### EXAMPLE TO REMOVE
-        params = self.configuration.parameters
+        params: dict = self.configuration.parameters
         # Access parameters in data/config.json
-        token = params[KEY_API_TOKEN]
+        api_key: str = params[KEY_API_KEY]
+        base_id: str = params[KEY_BASE_ID]
+        table_name: str = params[KEY_TABLE_NAME]
+        filter_by_formula: Optional[str] = params.get(
+            KEY_FILTER_BY_FORMULA, None)
+        fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
+        incremental_loading: bool = params.get(KEY_INCREMENTAL_LOADING, True)
 
-        # get last state data/in/state.json from previous run
-        previous_state = self.get_state_file()
+        table = Table(api_key, base_id, table_name)
 
-        # Create output table (Tabledefinition - just metadata)
-        table = self.create_out_table_definition('Features.csv', incremental=True, primary_key=['Id'])
+        args = {}
+        if filter_by_formula:
+            args['formula'] = filter_by_formula
+        if fields:
+            args['fields'] = fields
 
-        # get file path of the table (data/out/tables/Features.csv)
-        out_table_path = table.full_path
-        logging.info(out_table_path)
+        # Create output table definition
+        table_def = self.create_out_table_definition(
+            f'{table_name}.csv', incremental=incremental_loading, primary_key=[RECORD_ID_FIELD_NAME])
 
-        # DO whatever and save into out_table_path
-        #
+        # Save the table
+        with CachedOrthogonalDictWriter(table_def.full_path, []) as writer:
+            for record_batch in table.iterate(**args):
+                for record in record_batch:
+                    writer.writerow(process_record(record))
 
-        # Save table manifest (Features.csv.manifest) from the tabledefinition
-        self.write_tabledef_manifest(table)
-
-        # Write new state - will be available next run
-        self.write_state_file({"some_state_parameter": "value"})
-
-        if params.get(KEY_PRINT_HELLO):
-            logging.info("Hello World")
-
-        # ####### EXAMPLE TO REMOVE END
+        # Save table manifest ({table_name}.csv.manifest) from the table definition
+        header_normalizer = DefaultHeaderNormalizer()
+        table_def.columns = header_normalizer.normalize_header(
+            writer.fieldnames)
+        self.write_manifest(table_def)
 
 
 """
@@ -97,7 +95,11 @@ class Component(CommonInterface):
 if __name__ == "__main__":
     try:
         comp = Component()
-        comp.run()
+        # this triggers the run method by default and is controlled by the configuration.action parameter
+        comp.execute_action()
+    except UserException as exc:
+        logging.exception(exc)
+        exit(1)
     except Exception as exc:
         logging.exception(exc)
         exit(2)

@@ -1,1 +1,41 @@
-{}
+{
+      "title": "Configuration Schema",
+      "type": "object",
+      "required": [
+            "table_name"
+      ],
+      "properties": {
+            "table_name": {
+                  "propertyOrder": 40,
+                  "title": "Table name",
+                  "type": "string",
+                  "description": ""
+            },
+            "filter_by_formula": {
+                  "propertyOrder": 50,
+                  "title": "Filter by formula",
+                  "type": "string",
+                  "description": ""
+            },
+            "fields": {
+                  "propertyOrder": 60,
+                  "title": "Fields",
+                  "type": "array",
+                  "description": "",
+                  "format": "select",
+                  "uniqueItems": true,
+                  "items": {
+                        "type": "string",
+                        "title": "Field",
+                        "minLength": 1
+                  }
+            },
+            "incremental_loading": {
+                  "propertyOrder": 70,
+                  "title": "Incremental loading",
+                  "type": "boolean",
+                  "description": "",
+                  "format": "checkbox"
+            }
+      }
+}

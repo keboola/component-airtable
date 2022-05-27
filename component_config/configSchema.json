@@ -1,17 +1,30 @@
 {
-  "type": "object",
-  "title": "extractor configuration",
-  "required": [
-    "print_hello"
-  ],
-  "properties": {
-    "print_hello": {
-      "type": "string",
-      "title": "Debug"
-    },
-    "debug": {
-      "type": "string",
-      "title": "Debug"
-    }
-  }
+      "title": "Configuration Schema",
+      "type": "object",
+      "required": [
+            "#api_key",
+            "base_id"
+      ],
+      "properties": {
+            "debug": {
+                  "propertyOrder": 10,
+                  "title": "Debug",
+                  "type": "boolean",
+                  "description": "",
+                  "format": "checkbox"
+            },
+            "#api_key": {
+                  "propertyOrder": 20,
+                  "title": "API key",
+                  "type": "string",
+                  "description": "",
+                  "format": "password"
+            },
+            "base_id": {
+                  "propertyOrder": 30,
+                  "title": "Base ID",
+                  "type": "string",
+                  "description": ""
+            }
+      }
 }
