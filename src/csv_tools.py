@@ -149,9 +149,11 @@ class CachedOrthogonalDictWriter:
         src_file = os.path.join(self.temp_directory, final_writer_key)
 
         # write the result and add header.
-        with open(src_file, 'r', encoding=self.encoding) as source_file, open(self.result_path, 'w',
-                                                                              buffering=self.buffering,
-                                                                              encoding=self.encoding) as target_file:
+        with open(src_file, 'r',
+                  encoding=self.encoding) as source_file,\
+            open(self.result_path, 'w',
+                 buffering=self.buffering,
+                 encoding=self.encoding) as target_file:
             if not self._write_header:
                 source_file.readline()
             # this will truncate the file, so need to use a different file name:

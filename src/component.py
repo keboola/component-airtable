@@ -25,11 +25,19 @@ REQUIRED_IMAGE_PARS = []
 RECORD_ID_FIELD_NAME = 'record_id'
 RECORD_CREATED_TIME_FIELD_NAME = 'record_created_time'
 
+HEADER_NORMALIZER = DefaultHeaderNormalizer()
+
+"""
+TODO: Create a class (derived from pyairtable.Table or containing it as a field) that loads data
+into memory and then can create output table(s)
+"""
+
 
 def process_record(record: Dict) -> Dict:
+    fields = record['fields']
     output_record = {RECORD_ID_FIELD_NAME: record['id'],
-                     **record['fields'],
-                     RECORD_CREATED_TIME_FIELD_NAME: record['createdTime']}
+                     RECORD_CREATED_TIME_FIELD_NAME: record['createdTime'],
+                     **fields}
     return output_record
 
 
@@ -66,25 +74,25 @@ class Component(ComponentBase):
 
         table = Table(api_key, base_id, table_name)
 
-        args = {}
+        api_arguments_dict = {}
         if filter_by_formula:
-            args['formula'] = filter_by_formula
+            api_arguments_dict['formula'] = filter_by_formula
         if fields:
-            args['fields'] = fields
+            api_arguments_dict['fields'] = fields
 
         # Create output table definition
         table_def = self.create_out_table_definition(
-            f'{table_name}.csv', incremental=incremental_loading, primary_key=[RECORD_ID_FIELD_NAME])
+            f'{HEADER_NORMALIZER.normalize_header([table_name])[0]}.csv',
+            incremental=incremental_loading, primary_key=[RECORD_ID_FIELD_NAME])
 
         # Save the table
-        with CachedOrthogonalDictWriter(table_def.full_path, []) as writer:
-            for record_batch in table.iterate(**args):
+        with CachedOrthogonalDictWriter(table_def.full_path, fields if fields else []) as writer:
+            for record_batch in table.iterate(**api_arguments_dict):
                 for record in record_batch:
                     writer.writerow(process_record(record))
 
         # Save table manifest ({table_name}.csv.manifest) from the table definition
-        header_normalizer = DefaultHeaderNormalizer()
-        table_def.columns = header_normalizer.normalize_header(
+        table_def.columns = HEADER_NORMALIZER.normalize_header(
             writer.fieldnames)
         self.write_manifest(table_def)
 
