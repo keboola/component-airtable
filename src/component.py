@@ -1,13 +1,14 @@
 import logging
+import os
 from typing import Dict, List, Optional
 
 from keboola.component import ComponentBase
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
 
-from pyairtable import Table
+import pyairtable
 
-from csv_tools import CachedOrthogonalDictWriter
+from transformation import Table
 
 # configuration variables
 KEY_API_KEY = "#api_key"
@@ -25,12 +26,8 @@ REQUIRED_IMAGE_PARS = []
 RECORD_ID_FIELD_NAME = 'record_id'
 RECORD_CREATED_TIME_FIELD_NAME = 'record_created_time'
 
-HEADER_NORMALIZER = DefaultHeaderNormalizer()
-
-"""
-TODO: Create a class (derived from pyairtable.Table or containing it as a field) that loads data
-into memory and then can create output table(s)
-"""
+SUB = '_'
+HEADER_NORMALIZER = DefaultHeaderNormalizer(forbidden_sub=SUB)
 
 
 def process_record(record: Dict) -> Dict:
@@ -70,31 +67,37 @@ class Component(ComponentBase):
         filter_by_formula: Optional[str] = params.get(
             KEY_FILTER_BY_FORMULA, None)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
-        incremental_loading: bool = params.get(KEY_INCREMENTAL_LOADING, True)
+        self.incremental_loading: bool = params.get(
+            KEY_INCREMENTAL_LOADING, True)
 
-        table = Table(api_key, base_id, table_name)
+        api_table = pyairtable.Table(api_key, base_id, table_name)
 
-        api_arguments_dict = {}
+        api_options = {}
         if filter_by_formula:
-            api_arguments_dict['formula'] = filter_by_formula
+            api_options['formula'] = filter_by_formula
         if fields:
-            api_arguments_dict['fields'] = fields
+            api_options['fields'] = fields
 
-        # Create output table definition
+        for i, record_batch in enumerate(api_table.iterate(**api_options)):
+            record_batch_processed = [process_record(r) for r in record_batch]
+            table = Table.from_dicts(table_name, record_batch_processed,
+                                     id_column_name=RECORD_ID_FIELD_NAME)
+            self.save_table(table, str(i))
+
+    def save_table(self, table: Table, slice_name: str):
         table_def = self.create_out_table_definition(
-            f'{HEADER_NORMALIZER.normalize_header([table_name])[0]}.csv',
-            incremental=incremental_loading, primary_key=[RECORD_ID_FIELD_NAME])
-
-        # Save the table
-        with CachedOrthogonalDictWriter(table_def.full_path, fields if fields else []) as writer:
-            for record_batch in table.iterate(**api_arguments_dict):
-                for record in record_batch:
-                    writer.writerow(process_record(record))
-
-        # Save table manifest ({table_name}.csv.manifest) from the table definition
+            f'{HEADER_NORMALIZER.normalize_header([table.name])[0]}.csv',
+            incremental=self.incremental_loading,
+            primary_key=[table.id_column.name],
+            is_sliced=True)
+        os.makedirs(table_def.full_path, exist_ok=True)
+        table.df.to_csv(f'{table_def.full_path}/{slice_name}.csv',
+                        index=False, header=True)
         table_def.columns = HEADER_NORMALIZER.normalize_header(
-            writer.fieldnames)
+            col.name for col in table.columns)
         self.write_manifest(table_def)
+        for child_table in table.child_tables.values():
+            self.save_table(child_table, slice_name)
 
 
 """
