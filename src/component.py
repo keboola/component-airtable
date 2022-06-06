@@ -92,7 +92,7 @@ class Component(ComponentBase):
             is_sliced=True)
         os.makedirs(table_def.full_path, exist_ok=True)
         table.df.to_csv(f'{table_def.full_path}/{slice_name}.csv',
-                        index=False, header=True)
+                        index=False, header=False)
         table_def.columns = HEADER_NORMALIZER.normalize_header(
             col.name for col in table.columns)
         self.write_manifest(table_def)

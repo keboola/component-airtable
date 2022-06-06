@@ -79,6 +79,7 @@ class Table:
                 for row_dict in dicts]
             id_column = Column(name=COMPUTED_ID_COLUMN_NAME,
                                column_type=ColumnType.ELEMENTARY)
+            columns.append(id_column)
 
         table = cls(name=name, columns=columns.copy(), df=df,
                     raw_df=raw_df, id_column=id_column)
