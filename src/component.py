@@ -3,12 +3,14 @@ import os
 from typing import Dict, List, Optional
 
 from keboola.component import ComponentBase
+from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
 
 import pyairtable
 
 from transformation import Table
+from csv_tools import CachedOrthogonalDictWriter
 
 # Configuration variables
 KEY_API_KEY = "#api_key"
@@ -31,6 +33,10 @@ RECORD_CREATED_TIME_FIELD_NAME = "record_created_time"
 
 SUB = "_"
 HEADER_NORMALIZER = DefaultHeaderNormalizer(forbidden_sub=SUB)
+
+
+def normalize_name(name: str):
+    return HEADER_NORMALIZER.normalize_header([name])[0]
 
 
 def process_record(record: Dict) -> Dict:
@@ -76,6 +82,8 @@ class Component(ComponentBase):
         self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
             KEY_TABLES_COLUMNS, {}
         )
+        self.table_definitions: Dict[str, TableDefinition] = {}
+        self.csv_writers: Dict[str, CachedOrthogonalDictWriter] = {}
 
         api_table = pyairtable.Table(api_key, base_id, table_name)
 
@@ -90,32 +98,46 @@ class Component(ComponentBase):
             table = Table.from_dicts(
                 table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
             )
-            self.save_table(table, str(i))
+            self.process_table(table, str(i))
+
+        self.finalize_all_tables()
         self.write_state_file(self.state)
 
-    def save_table(self, table: Table, slice_name: str):
-        table_def = self.create_out_table_definition(
-            name=f"{HEADER_NORMALIZER.normalize_header([table.name])[0]}.csv",
-            incremental=self.incremental_loading,
-            primary_key=[table.id_column.name],
-            is_sliced=True,
-        )
+    def process_table(self, table: Table, slice_name: str):
+        table.rename_columns(normalize_name)
+        table.name = normalize_name(table.name)
 
-        table_def.columns = HEADER_NORMALIZER.normalize_header(
-            col.name for col in table.columns
+        self.table_definitions[table.name] = table_def = self.table_definitions.get(
+            table.name,
+            self.create_out_table_definition(
+                name=f"{table.name}.csv",
+                incremental=self.incremental_loading,
+                primary_key=[table.id_column.name],
+                is_sliced=True,
+            ),
         )
-        missing_columns = sorted(
-            set(self.tables_columns[table_def.name]) - set(table_def.columns)
+        self.csv_writers[table.name] = csv_writer = self.csv_writers.get(
+            table.name,
+            CachedOrthogonalDictWriter(
+                file_path=f"{table_def.full_path}/{slice_name}.csv",
+                fieldnames=self.tables_columns[table.name],
+            ),
         )
-        table.ensure_columns(missing_columns)
-        table_def.columns += missing_columns
-        self.tables_columns[table_def.name] = table_def.columns
 
         os.makedirs(table_def.full_path, exist_ok=True)
-        table.save_to_csv(f"{table_def.full_path}/{slice_name}.csv")
-        self.write_manifest(table_def)
+        csv_writer.writerows(table.to_dicts())
+
         for child_table in table.child_tables.values():
-            self.save_table(child_table, slice_name)
+            self.process_table(child_table, slice_name)
+
+    def finalize_all_tables(self):
+        for table_name in self.csv_writers:
+            csv_writer = self.csv_writers[table_name]
+            table_def = self.table_definitions[table_name]
+            table_def.columns = csv_writer.fieldnames
+            self.tables_columns[table_name] = table_def.columns
+            self.write_manifest(table_def)
+            csv_writer.close()
 
 
 """

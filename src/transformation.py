@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
-from typing import Dict, Iterable, Optional, Union, Type, List
+from typing import Any, Callable, Dict, Optional, Union, Type, List
 import json
 from functools import reduce
 import hashlib
@@ -44,7 +44,7 @@ class ColumnType(Enum):
         )
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class Column:
     name: str
     column_type: ColumnType
@@ -150,10 +150,9 @@ class Table:
             id_column=self.id_column,
         )
 
-    def ensure_columns(self, columns: Iterable[str], filler=""):
-        for column in columns:
-            if column not in self.df.columns:
-                self.df[column] = filler
+    def rename_columns(self, rename_function: Callable[[str], str]):
+        for column in self.columns:
+            column.name = rename_function(column.name)
 
-    def save_to_csv(self, file_path: str, header: bool = False):
-        self.df.to_csv(file_path, index=False, header=header)
+    def to_dicts(self) -> List[Dict[str, Any]]:
+        return self.df.to_dict(orient="records")
