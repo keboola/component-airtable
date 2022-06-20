@@ -1,13 +1,21 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
-from typing import Any, Callable, Dict, Optional, Union, Type, List
+from typing import Any, Callable, Dict, Optional, Union, Type, List, Set
 import json
 from functools import reduce
 import hashlib
 
 import pandas as pd
 import typeguard
+
+
+SEP = "_"
+COMPUTED_ID_COLUMN_NAME = "computed_id"
+PARENT_ID_COLUMN_NAME = "parent_id"
+
+
+ELEMENTARY_TYPE = Union[int, float, str, bool, NoneType]
 
 
 def is_type(val, type: Type) -> bool:
@@ -19,12 +27,11 @@ def is_type(val, type: Type) -> bool:
         return True
 
 
-SEP = "_"
-COMPUTED_ID_COLUMN_NAME = "computed_id"
-PARENT_ID_COLUMN_NAME = "parent_id"
-
-
-ELEMENTARY_TYPE = Union[int, float, str, bool, NoneType]
+@dataclass(slots=True)
+class KeboolaDeleteWhereSpec:
+    column: str
+    values: Set[str] = field(default_factory=lambda: set())
+    operator: str = "eq"
 
 
 class ColumnType(Enum):
@@ -57,8 +64,7 @@ class Table:
     df: pd.DataFrame
     id_column: Column
     child_tables: Dict[str, "Table"] = field(default_factory=dict)
-    raw_df: Optional[pd.DataFrame] = None
-    # TODO: add delete_where spec - will need to discriminate computed id case and proper id case
+    delete_where_spec: Optional[KeboolaDeleteWhereSpec] = None
 
     @classmethod
     def from_dicts(
@@ -69,7 +75,6 @@ class Table:
                 f"Requested table is empty, Cannot handle empty tables."
                 f' Please, make sure that table "{name}" contains at least one record.'
             )
-        raw_df = pd.DataFrame.from_records(dicts)
         df = pd.json_normalize(dicts, sep=SEP)
         df.fillna("", inplace=True)
         first_dict = df.iloc[0].to_dict()
@@ -92,9 +97,7 @@ class Table:
             )
             columns.append(id_column)
 
-        table = cls(
-            name=name, columns=columns.copy(), df=df, raw_df=raw_df, id_column=id_column
-        )
+        table = cls(name=name, columns=columns.copy(), df=df, id_column=id_column)
         for column in columns:
             table._process_column(column)
         return table
@@ -111,19 +114,26 @@ class Table:
         elif column.column_type is ColumnType.ARRAY_OF_OBJECTS:
             child_table_name = f"{self.name}__{column.name}"
             child_table_parts: List[Table] = []
+            delete_where_spec = KeboolaDeleteWhereSpec(column=PARENT_ID_COLUMN_NAME)
             for i, row_value in self.df[column.name].iteritems():
-                if is_type(row_value, column.column_type.value):
+                if is_type(
+                    row_value, column.column_type.value
+                ):  # This if statement is to avoid missing values
                     for e in row_value:
-                        e[PARENT_ID_COLUMN_NAME] = self.df[self.id_column.name][i]
+                        e[PARENT_ID_COLUMN_NAME] = parent_id = self.df[
+                            self.id_column.name
+                        ][i]
+                        delete_where_spec.values.add(parent_id)
                     child_table_parts.append(
                         self.__class__.from_dicts(
                             name=child_table_name, dicts=row_value
                         )
                     )
             if child_table_parts:
-                self.child_tables[child_table_name] = reduce(
+                self.child_tables[child_table_name] = child_table = reduce(
                     lambda x, y: x + y, child_table_parts
                 )
+                child_table.delete_where_spec = delete_where_spec
             self.columns.remove(column)
             self.df.drop([column.name], axis="columns", inplace=True)
         else:

@@ -9,7 +9,7 @@ from keboola.utils.header_normalizer import DefaultHeaderNormalizer
 
 import pyairtable
 
-from transformation import Table
+from transformation import Table, KeboolaDeleteWhereSpec
 from csv_tools import CachedOrthogonalDictWriter
 
 # Configuration variables
@@ -84,6 +84,7 @@ class Component(ComponentBase):
         )
         self.table_definitions: Dict[str, TableDefinition] = {}
         self.csv_writers: Dict[str, CachedOrthogonalDictWriter] = {}
+        self.delete_where_specs: Dict[str, Optional[KeboolaDeleteWhereSpec]] = {}
 
         api_table = pyairtable.Table(api_key, base_id, table_name)
 
@@ -123,9 +124,18 @@ class Component(ComponentBase):
                 fieldnames=self.tables_columns[table.name],
             ),
         )
+        self.delete_where_specs[
+            table.name
+        ] = delete_where_spec = self.delete_where_specs.get(
+            table.name, table.delete_where_spec
+        )
 
         os.makedirs(table_def.full_path, exist_ok=True)
         csv_writer.writerows(table.to_dicts())
+        if table.delete_where_spec:
+            assert table.delete_where_spec.column == delete_where_spec.column
+            assert table.delete_where_spec.operator == delete_where_spec.operator
+            delete_where_spec.values.update(table.delete_where_spec.values)
 
         for child_table in table.child_tables.values():
             self.process_table(child_table, slice_name)
@@ -136,6 +146,15 @@ class Component(ComponentBase):
             table_def = self.table_definitions[table_name]
             table_def.columns = csv_writer.fieldnames
             self.tables_columns[table_name] = table_def.columns
+            delete_where_spec = self.delete_where_specs[table_name]
+            if delete_where_spec:
+                table_def.set_delete_where_from_dict(
+                    {
+                        "column": delete_where_spec.column,
+                        "operator": delete_where_spec.operator,
+                        "values": list(delete_where_spec.values),
+                    }
+                )
             self.write_manifest(table_def)
             csv_writer.close()
 
