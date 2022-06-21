@@ -1,1 +1,1 @@
-First draft of Airtable extractor.
+This is an extractor that allows you to extract tables from Airtable bases. You must know your Airtable API key and ID of the base.

@@ -10,21 +10,21 @@
                   "propertyOrder": 10,
                   "title": "Debug",
                   "type": "boolean",
-                  "description": "",
+                  "description": "Whether you want to run the configuration in debug mode.",
                   "format": "checkbox"
             },
             "#api_key": {
                   "propertyOrder": 20,
                   "title": "API key",
                   "type": "string",
-                  "description": "",
+                  "description": "The API key to authenticate the connection with Airtable.",
                   "format": "password"
             },
             "base_id": {
                   "propertyOrder": 30,
                   "title": "Base ID",
                   "type": "string",
-                  "description": ""
+                  "description": "The ID of the base you want to extract tables from."
             }
       }
 }
