@@ -1,16 +1,15 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
-from typing import Any, Callable, Dict, Optional, Union, Type, List, Set
+from typing import Any, Callable, Dict, Optional, Union, Type, List, Set, MutableMapping
 import json
-from functools import reduce
 import hashlib
 
-import pandas as pd
 import typeguard
 
 
-SEP = "_"
+SUBOBJECT_SEP = "_"
+CHILD_TABLE_SEP = "__"
 COMPUTED_ID_COLUMN_NAME = "computed_id"
 PARENT_ID_COLUMN_NAME = "parent_id"
 
@@ -25,6 +24,25 @@ def is_type(val, type: Type) -> bool:
         return False
     else:
         return True
+
+
+def flatten_dict(
+    dictionary: Dict,
+    parent_key: Optional[str] = None,
+    separator: str = SUBOBJECT_SEP,
+    flatten_lists: bool = False,
+):
+    items = []
+    for key, value in dictionary.items():
+        new_key = str(parent_key) + separator + key if parent_key else key
+        if isinstance(value, MutableMapping):
+            items.extend(flatten_dict(value, new_key, separator).items())
+        elif flatten_lists and isinstance(value, list):
+            for k, v in enumerate(value):
+                items.extend(flatten_dict({str(k): v}, new_key).items())
+        else:
+            items.append((new_key, value))
+    return dict(items)
 
 
 @dataclass(slots=True)
@@ -52,117 +70,88 @@ class ColumnType(Enum):
 
 
 @dataclass(slots=True)
-class Column:
-    name: str
-    column_type: ColumnType
-
-
-@dataclass(slots=True)
 class Table:
     name: str
-    columns: List[Column]
-    df: pd.DataFrame
-    id_column: Column
+    id_column_name: str
+    rows: List[Dict[str, Any]] = field(default_factory=list)
     child_tables: Dict[str, "Table"] = field(default_factory=dict)
     delete_where_spec: Optional[KeboolaDeleteWhereSpec] = None
 
     @classmethod
     def from_dicts(
-        cls, name: str, dicts: List[Dict], id_column_name: Optional[str] = None
+        cls,
+        name: str,
+        dicts: List[Dict[str, Any]],
+        id_column_name: Optional[str] = None,
     ):
         if len(dicts) < 1:
             raise ValueError(
                 f"Requested table is empty, Cannot handle empty tables."
                 f' Please, make sure that table "{name}" contains at least one record.'
             )
-        df = pd.json_normalize(dicts, sep=SEP)
-        df.fillna("", inplace=True)
-        first_dict = df.iloc[0].to_dict()
-        columns = [
-            Column(name=name, column_type=ColumnType.from_example_value(value))
-            for name, value in first_dict.items()
-        ]
-
-        if id_column_name:
-            id_column = [c for c in columns if c.name == id_column_name][0]
-        else:
-            df[COMPUTED_ID_COLUMN_NAME] = [
-                hashlib.md5(
-                    json.dumps(row_dict, sort_keys=True).encode("utf-8")
-                ).hexdigest()
-                for row_dict in dicts
-            ]
-            id_column = Column(
-                name=COMPUTED_ID_COLUMN_NAME, column_type=ColumnType.ELEMENTARY
-            )
-            columns.append(id_column)
-
-        table = cls(name=name, columns=columns.copy(), df=df, id_column=id_column)
-        for column in columns:
-            table._process_column(column)
+        if not id_column_name:
+            id_column_name = COMPUTED_ID_COLUMN_NAME
+        table = cls(name=name, id_column_name=id_column_name)
+        for row_dict in dicts:
+            table.add_row(row_dict)
         return table
 
-    def _process_column(self, column: Column):
-        if column.column_type is ColumnType.ELEMENTARY:
-            return  # no need to do anything
-        elif column.column_type is ColumnType.OBJECT:
-            return  # no need to do anything (thanks to pd.json_normalize)
-        elif column.column_type is ColumnType.ARRAY_OF_ELEMENTARY:
-            self.df[column.name] = self.df[column.name].apply(
-                lambda v: json.dumps(v) if v else ""
-            )
-        elif column.column_type is ColumnType.ARRAY_OF_OBJECTS:
-            child_table_name = f"{self.name}__{column.name}"
-            child_table_parts: List[Table] = []
-            delete_where_spec = KeboolaDeleteWhereSpec(column=PARENT_ID_COLUMN_NAME)
-            for i, row_value in self.df[column.name].iteritems():
-                if is_type(
-                    row_value, column.column_type.value
-                ):  # This if statement is to avoid missing values
-                    for e in row_value:
-                        e[PARENT_ID_COLUMN_NAME] = parent_id = self.df[
-                            self.id_column.name
-                        ][i]
-                        delete_where_spec.values.add(parent_id)
-                    child_table_parts.append(
-                        self.__class__.from_dicts(
-                            name=child_table_name, dicts=row_value
-                        )
-                    )
-            if child_table_parts:
-                self.child_tables[child_table_name] = child_table = reduce(
-                    lambda x, y: x + y, child_table_parts
+    def add_row(self, row_dict: Dict[str, Any]):
+        def add_value_to_row(column_name: str, value, row_dict: Dict[str, Any]):
+            if not value:
+                return
+            column_type = ColumnType.from_example_value(value)
+            if column_type is ColumnType.ELEMENTARY:
+                row_dict[column_name] = value  # no need to do anything
+            elif column_type is ColumnType.OBJECT:
+                flattened_dict = flatten_dict(value, parent_key=column_name)
+                for flattened_key, flattened_value in flattened_dict.items():
+                    add_value_to_row(flattened_key, flattened_value, row_dict)
+            elif column_type is ColumnType.ARRAY_OF_ELEMENTARY:
+                row_dict[column_name] = json.dumps(
+                    value
+                )  # TODO?: maybe create child table instead?
+            elif column_type is ColumnType.ARRAY_OF_OBJECTS:
+                child_table_name = f"{self.name}{CHILD_TABLE_SEP}{column_name}"
+                self.child_tables[
+                    child_table_name
+                ] = child_table = self.child_tables.get(
+                    child_table_name,
+                    self.__class__(
+                        name=child_table_name,
+                        id_column_name=COMPUTED_ID_COLUMN_NAME,
+                        delete_where_spec=KeboolaDeleteWhereSpec(
+                            column=PARENT_ID_COLUMN_NAME
+                        ),
+                    ),
                 )
-                child_table.delete_where_spec = delete_where_spec
-            self.columns.remove(column)
-            self.df.drop([column.name], axis="columns", inplace=True)
-        else:
-            raise ValueError(f"Invalid column data type: {column.column_type}.")
-
-    def __add__(self, other: "Table"):
-        assert self.name == other.name
-        assert self.columns == other.columns
-        assert self.id_column == other.id_column
-        df = pd.concat((self.df, other.df), ignore_index=True)
-        child_tables: Dict[str, "Table"] = {}
-        for others_child_table_name, others_child_table in other.child_tables.items():
-            if others_child_table_name in self.child_tables:
-                child_tables[others_child_table_name] = (
-                    self.child_tables[others_child_table_name] + others_child_table
-                )
+                for child_dict in value:
+                    child_dict: Dict
+                    child_dict[PARENT_ID_COLUMN_NAME] = parent_id = row_dict[
+                        self.id_column_name
+                    ]
+                    child_table.add_row(child_dict)
+                    child_table.delete_where_spec.values.add(parent_id)
             else:
-                child_tables[others_child_table_name] = others_child_table
-        return self.__class__(
-            name=self.name,
-            columns=self.columns,
-            df=df,
-            child_tables=child_tables,
-            id_column=self.id_column,
+                raise ValueError(f"Invalid column data type: {column_type}.")
+
+        processed_dict = {}
+        id_value = row_dict.get(  # Need to process the ID column first
+            self.id_column_name,
+            hashlib.md5(
+                json.dumps(row_dict, sort_keys=True).encode("utf-8")
+            ).hexdigest(),  # If there is no ID column value, we use MD5 hash instead
         )
+        add_value_to_row(self.id_column_name, id_value, processed_dict)
+        for column_name, value in row_dict.items():
+            if column_name != self.id_column_name:
+                add_value_to_row(column_name, value, processed_dict)
+        self.rows.append(processed_dict)
 
     def rename_columns(self, rename_function: Callable[[str], str]):
-        for column in self.columns:
-            column.name = rename_function(column.name)
+        self.rows = [
+            {rename_function(k): v for k, v in row.items()} for row in self.rows
+        ]
 
     def to_dicts(self) -> List[Dict[str, Any]]:
-        return self.df.to_dict(orient="records")
+        return self.rows

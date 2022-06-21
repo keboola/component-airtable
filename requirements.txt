@@ -4,5 +4,4 @@ keboola.component
 keboola.http-client
 keboola.utils
 pyairtable
-pandas
 typeguard

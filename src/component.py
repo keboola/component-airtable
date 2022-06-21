@@ -113,7 +113,7 @@ class Component(ComponentBase):
             self.create_out_table_definition(
                 name=f"{table.name}.csv",
                 incremental=self.incremental_loading,
-                primary_key=[table.id_column.name],
+                primary_key=[table.id_column_name],
                 is_sliced=True,
             ),
         )
