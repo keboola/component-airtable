@@ -121,7 +121,7 @@ class Component(ComponentBase):
             table.name,
             CachedOrthogonalDictWriter(
                 file_path=f"{table_def.full_path}/{slice_name}.csv",
-                fieldnames=self.tables_columns[table.name],
+                fieldnames=self.tables_columns.get(table.name, []),
             ),
         )
         self.delete_where_specs[
@@ -144,8 +144,7 @@ class Component(ComponentBase):
         for table_name in self.csv_writers:
             csv_writer = self.csv_writers[table_name]
             table_def = self.table_definitions[table_name]
-            table_def.columns = csv_writer.fieldnames
-            self.tables_columns[table_name] = table_def.columns
+            self.tables_columns[table_name] = table_def.columns = csv_writer.fieldnames
             delete_where_spec = self.delete_where_specs[table_name]
             if delete_where_spec:
                 table_def.set_delete_where_from_dict(
