@@ -13,9 +13,10 @@
             },
             "filter_by_formula": {
                   "propertyOrder": 50,
+                  "default": "DATETIME_DIFF(NOW(), CREATED_TIME(), 'days') > 3",
                   "title": "Filter by formula",
                   "type": "string",
-                  "description": "A predicate (expression that evaluates to true or false) Airtable field formula."
+                  "description": "A predicate (expression that evaluates to true or false) Airtable field formula. For syntax refer <a href=\"https://support.airtable.com/hc/en-us/articles/203255215-Formula-Field-Reference\">here</a>"
             },
             "fields": {
                   "propertyOrder": 60,

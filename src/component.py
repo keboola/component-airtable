@@ -2,15 +2,15 @@ import logging
 import os
 from typing import Dict, List, Optional
 
+import pyairtable
 from keboola.component import ComponentBase
 from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
+from requests import HTTPError
 
-import pyairtable
-
-from transformation import Table, KeboolaDeleteWhereSpec
 from csv_tools import CachedOrthogonalDictWriter
+from transformation import Table, KeboolaDeleteWhereSpec
 
 # Configuration variables
 KEY_API_KEY = "#api_key"
@@ -66,6 +66,13 @@ class Component(ComponentBase):
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
 
+        self.table_definitions: Dict[str, TableDefinition] = {}
+        self.csv_writers: Dict[str, CachedOrthogonalDictWriter] = {}
+        self.delete_where_specs: Dict[str, Optional[KeboolaDeleteWhereSpec]] = {}
+        self.tables_columns = dict()
+
+        self.state = self.get_state_file()
+
     def run(self):
         """
         Main execution code
@@ -78,13 +85,9 @@ class Component(ComponentBase):
         filter_by_formula: Optional[str] = params.get(KEY_FILTER_BY_FORMULA, None)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
         self.incremental_loading: bool = params.get(KEY_INCREMENTAL_LOADING, True)
-        self.state = self.get_state_file()
         self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
             KEY_TABLES_COLUMNS, {}
         )
-        self.table_definitions: Dict[str, TableDefinition] = {}
-        self.csv_writers: Dict[str, CachedOrthogonalDictWriter] = {}
-        self.delete_where_specs: Dict[str, Optional[KeboolaDeleteWhereSpec]] = {}
 
         api_table = pyairtable.Table(api_key, base_id, table_name)
 
@@ -93,13 +96,15 @@ class Component(ComponentBase):
             api_options["formula"] = filter_by_formula
         if fields:
             api_options["fields"] = fields
-
-        for i, record_batch in enumerate(api_table.iterate(**api_options)):
-            record_batch_processed = [process_record(r) for r in record_batch]
-            table = Table.from_dicts(
-                table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
-            )
-            self.process_table(table, str(i))
+        try:
+            for i, record_batch in enumerate(api_table.iterate(**api_options)):
+                record_batch_processed = [process_record(r) for r in record_batch]
+                table = Table.from_dicts(
+                    table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
+                )
+                self.process_table(table, str(i))
+        except HTTPError as err:
+            self._handle_http_error(err)
 
         self.finalize_all_tables()
         self.write_state_file(self.state)
@@ -156,6 +161,11 @@ class Component(ComponentBase):
                 )
             self.write_manifest(table_def)
             csv_writer.close()
+
+    def _handle_http_error(self, error: HTTPError):
+        json_message = error.response.json()["error"]
+        message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
+        raise UserException(message) from error
 
 
 """
