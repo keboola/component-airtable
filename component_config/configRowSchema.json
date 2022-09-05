@@ -1,41 +1,48 @@
 {
-      "title": "Configuration Schema",
-      "type": "object",
-      "required": [
-            "table_name"
-      ],
-      "properties": {
-            "table_name": {
-                  "propertyOrder": 40,
-                  "title": "Table name",
-                  "type": "string",
-                  "description": "The name of the table in Airtable base you want to download."
-            },
-            "filter_by_formula": {
-                  "propertyOrder": 50,
-                  "title": "Filter by formula",
-                  "type": "string",
-                  "description": "A predicate (expression that evaluates to true or false) Airtable field formula."
-            },
-            "fields": {
-                  "propertyOrder": 60,
-                  "title": "Fields",
-                  "type": "array",
-                  "description": "The fields you want to download. You may leave this empty to download all fields.",
-                  "format": "select",
-                  "uniqueItems": true,
-                  "items": {
-                        "type": "string",
-                        "title": "Field",
-                        "minLength": 1
-                  }
-            },
-            "incremental_loading": {
-                  "propertyOrder": 70,
-                  "title": "Incremental loading",
-                  "type": "boolean",
-                  "description": "Whether incremental loading should be used.",
-                  "format": "checkbox"
-            }
+  "title": "Row configuration",
+  "type": "object",
+  "required": [
+    "table_name"
+  ],
+  "properties": {
+    "table_name": {
+      "propertyOrder": 40,
+      "title": "Table name",
+      "type": "string",
+      "description": "The name of the table in Airtable base you want to download."
+    },
+    "filter_by_formula": {
+      "propertyOrder": 50,
+      "title": "Filter by formula",
+      "type": "string",
+      "description": "A predicate (expression that evaluates to true or false) Airtable field formula."
+    },
+    "fields": {
+      "propertyOrder": 60,
+      "title": "Fields",
+      "type": "array",
+      "description": "The fields you want to download. You may leave this empty to download all fields.",
+      "format": "select",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "title": "Field",
+        "minLength": 1
       }
+    },
+    "incremental_loading": {
+      "propertyOrder": 70,
+      "title": "Incremental loading",
+      "type": "boolean",
+      "description": "Whether incremental loading should be used.",
+      "format": "checkbox"
+    },
+    "debug": {
+      "propertyOrder": 80,
+      "title": "Debug",
+      "type": "boolean",
+      "description": "When checked, logging will be more verbose",
+      "format": "checkbox"
+    }
+  }
 }

@@ -1,18 +1,11 @@
 {
-      "title": "Configuration Schema",
+      "title": "Airtable Credentials",
       "type": "object",
       "required": [
             "#api_key",
             "base_id"
       ],
       "properties": {
-            "debug": {
-                  "propertyOrder": 10,
-                  "title": "Debug",
-                  "type": "boolean",
-                  "description": "Whether you want to run the configuration in debug mode.",
-                  "format": "checkbox"
-            },
             "#api_key": {
                   "propertyOrder": 20,
                   "title": "API key",
