@@ -1,1 +1,1 @@
-This is an extractor that allows you to extract tables from Airtable bases.
+Airtable is an online platform for creating and sharing relational databases.
