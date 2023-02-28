@@ -3,11 +3,14 @@ import os
 from typing import Dict, List, Optional
 
 from keboola.component import ComponentBase
+from keboola.component.base import sync_action
 from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
 
 import pyairtable
+import pyairtable.metadata
+from pyairtable import Api, Base, Table as ApiTable
 
 from transformation import Table, KeboolaDeleteWhereSpec
 from csv_tools import CachedOrthogonalDictWriter
@@ -62,14 +65,14 @@ class Component(ComponentBase):
 
     def __init__(self):
         super().__init__()
-        # Check for missing configuration parameters
-        self.validate_configuration_parameters(REQUIRED_PARAMETERS)
-        self.validate_image_parameters(REQUIRED_IMAGE_PARS)
 
     def run(self):
         """
         Main execution code
         """
+        # Check for missing configuration parameters
+        self.validate_configuration_parameters(REQUIRED_PARAMETERS)
+        self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         params: dict = self.configuration.parameters
         # Access parameters in data/config.json
         api_key: str = params[KEY_API_KEY]
@@ -103,6 +106,47 @@ class Component(ComponentBase):
 
         self.finalize_all_tables()
         self.write_state_file(self.state)
+
+    @sync_action('list_bases')
+    def list_bases(self):
+        params: dict = self.configuration.parameters
+        api_key: str = params[KEY_API_KEY]
+        api = Api(api_key)
+        bases = pyairtable.metadata.get_api_bases(api)
+        resp = [dict(value=base['id'], label=f"{base['name']} ({base['id']})") for base in bases['bases']]
+        return resp
+
+    @sync_action('list_tables')
+    def list_bases(self):
+        params: dict = self.configuration.parameters
+        api_key: str = params[KEY_API_KEY]
+        base_id: str = params[KEY_BASE_ID]
+        base = Base(api_key, base_id)
+        tables = pyairtable.metadata.get_base_schema(base)
+        resp = [dict(value=table['id'], label=f"{table['name']} ({table['id']})") for table in tables['tables']]
+        return resp
+
+    @sync_action('list_fields')
+    def list_fields(self):
+        params: dict = self.configuration.parameters
+        api_key: str = params[KEY_API_KEY]
+        base_id: str = params[KEY_BASE_ID]
+        table_name: str = params[KEY_TABLE_NAME]
+        table = ApiTable(api_key, base_id, table_name)
+        # we cannot use library method get_table_schema se it searches by table name
+        #    fields = pyairtable.metadata.get_table_schema(table)
+        # we must use our own version searching for a table id
+        base_schema = pyairtable.metadata.get_base_schema(table)
+        table_record = None
+        for record in base_schema.get("tables", []):
+            if record["id"] == table_name:
+                table_record = record
+                break
+        if not table_record:
+            return []
+        resp = [dict(value=field['id'], label=f"{field['name']} ({field['id']})") for field in
+                table_record.get('fields', [])]
+        return resp
 
     def process_table(self, table: Table, slice_name: str):
         table.rename_columns(normalize_name)

@@ -1,6 +1,6 @@
 mock
 freezegun
-keboola.component
+keboola.component==1.4.0
 keboola.http-client
 keboola.utils
 pyairtable
