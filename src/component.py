@@ -117,7 +117,7 @@ class Component(ComponentBase):
         return resp
 
     @sync_action('list_tables')
-    def list_bases(self):
+    def list_tables(self):
         params: dict = self.configuration.parameters
         api_key: str = params[KEY_API_KEY]
         base_id: str = params[KEY_BASE_ID]
