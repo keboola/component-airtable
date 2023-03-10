@@ -7,13 +7,14 @@ from keboola.component.base import sync_action
 from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
+from requests import HTTPError
 
 import pyairtable
 import pyairtable.metadata
 from pyairtable import Api, Base, Table as ApiTable
 
-from transformation import Table, KeboolaDeleteWhereSpec
 from csv_tools import CachedOrthogonalDictWriter
+from transformation import Table, KeboolaDeleteWhereSpec
 
 # Configuration variables
 KEY_API_KEY = "#api_key"
@@ -66,6 +67,13 @@ class Component(ComponentBase):
     def __init__(self):
         super().__init__()
 
+        self.table_definitions: Dict[str, TableDefinition] = {}
+        self.csv_writers: Dict[str, CachedOrthogonalDictWriter] = {}
+        self.delete_where_specs: Dict[str, Optional[KeboolaDeleteWhereSpec]] = {}
+        self.tables_columns = dict()
+        self.incremental_loading: bool = False
+        self.state = dict()
+
     def run(self):
         """
         Main execution code
@@ -73,6 +81,7 @@ class Component(ComponentBase):
         # Check for missing configuration parameters
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
+        self.state = self.get_state_file()
         params: dict = self.configuration.parameters
         # Access parameters in data/config.json
         api_key: str = params[KEY_API_KEY]
@@ -81,13 +90,9 @@ class Component(ComponentBase):
         filter_by_formula: Optional[str] = params.get(KEY_FILTER_BY_FORMULA, None)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
         self.incremental_loading: bool = params.get(KEY_INCREMENTAL_LOADING, True)
-        self.state = self.get_state_file()
         self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
             KEY_TABLES_COLUMNS, {}
         )
-        self.table_definitions: Dict[str, TableDefinition] = {}
-        self.csv_writers: Dict[str, CachedOrthogonalDictWriter] = {}
-        self.delete_where_specs: Dict[str, Optional[KeboolaDeleteWhereSpec]] = {}
 
         api_table = pyairtable.Table(api_key, base_id, table_name)
 
@@ -96,13 +101,15 @@ class Component(ComponentBase):
             api_options["formula"] = filter_by_formula
         if fields:
             api_options["fields"] = fields
-
-        for i, record_batch in enumerate(api_table.iterate(**api_options)):
-            record_batch_processed = [process_record(r) for r in record_batch]
-            table = Table.from_dicts(
-                table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
-            )
-            self.process_table(table, str(i))
+        try:
+            for i, record_batch in enumerate(api_table.iterate(**api_options)):
+                record_batch_processed = [process_record(r) for r in record_batch]
+                table = Table.from_dicts(
+                    table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
+                )
+                self.process_table(table, str(i))
+        except HTTPError as err:
+            self._handle_http_error(err)
 
         self.finalize_all_tables()
         self.write_state_file(self.state)
@@ -110,7 +117,9 @@ class Component(ComponentBase):
     @sync_action('list_bases')
     def list_bases(self):
         params: dict = self.configuration.parameters
-        api_key: str = params[KEY_API_KEY]
+        api_key: str = params.get(KEY_API_KEY)
+        if not api_key:
+            raise UserException('API key or personal token missing')
         api = Api(api_key)
         bases = pyairtable.metadata.get_api_bases(api)
         resp = [dict(value=base['id'], label=f"{base['name']} ({base['id']})") for base in bases['bases']]
@@ -119,8 +128,12 @@ class Component(ComponentBase):
     @sync_action('list_tables')
     def list_tables(self):
         params: dict = self.configuration.parameters
-        api_key: str = params[KEY_API_KEY]
-        base_id: str = params[KEY_BASE_ID]
+        api_key: str = params.get(KEY_API_KEY)
+        if not api_key:
+            raise UserException('API key or personal token is missing')
+        base_id: str = params.get(KEY_BASE_ID)
+        if not base_id:
+            raise UserException('Base ID is missing')
         base = Base(api_key, base_id)
         tables = pyairtable.metadata.get_base_schema(base)
         resp = [dict(value=table['id'], label=f"{table['name']} ({table['id']})") for table in tables['tables']]
@@ -129,9 +142,15 @@ class Component(ComponentBase):
     @sync_action('list_fields')
     def list_fields(self):
         params: dict = self.configuration.parameters
-        api_key: str = params[KEY_API_KEY]
-        base_id: str = params[KEY_BASE_ID]
-        table_name: str = params[KEY_TABLE_NAME]
+        api_key: str = params.get(KEY_API_KEY)
+        if not api_key:
+            raise UserException('API key or personal token is missing')
+        base_id: str = params.get(KEY_BASE_ID)
+        if not base_id:
+            raise UserException('Base ID is missing')
+        table_name: str = params.get(KEY_TABLE_NAME)
+        if not table_name:
+            raise UserException('Table name is missing')
         table = ApiTable(api_key, base_id, table_name)
         # we cannot use library method get_table_schema se it searches by table name
         #    fields = pyairtable.metadata.get_table_schema(table)
@@ -200,6 +219,12 @@ class Component(ComponentBase):
                 )
             self.write_manifest(table_def)
             csv_writer.close()
+
+    @staticmethod
+    def _handle_http_error(error: HTTPError):
+        json_message = error.response.json()["error"]
+        message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
+        raise UserException(message) from error
 
 
 """
