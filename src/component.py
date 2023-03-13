@@ -23,6 +23,7 @@ KEY_TABLE_NAME = "table_name"
 KEY_FILTER_BY_FORMULA = "filter_by_formula"
 KEY_FIELDS = "fields"
 KEY_INCREMENTAL_LOADING = "incremental_loading"
+KEY_GROUP_DESTINATION = "destination"
 
 # State variables
 KEY_TABLES_COLUMNS = "tables_columns"
@@ -89,7 +90,9 @@ class Component(ComponentBase):
         table_name: str = params[KEY_TABLE_NAME]
         filter_by_formula: Optional[str] = params.get(KEY_FILTER_BY_FORMULA, None)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
-        self.incremental_loading: bool = params.get(KEY_INCREMENTAL_LOADING, True)
+        self.incremental_loading: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOADING: True})\
+            .get(KEY_INCREMENTAL_LOADING)
+        output_table: str = params.get(KEY_GROUP_DESTINATION, {KEY_TABLE_NAME: ''}).get(KEY_TABLE_NAME)
         self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
             KEY_TABLES_COLUMNS, {}
         )
@@ -107,6 +110,11 @@ class Component(ComponentBase):
                 table = Table.from_dicts(
                     table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
                 )
+                if not output_table:
+                    # see comments in list_fields() why we must go throuch get_base_schema()
+                    tables = pyairtable.metadata.get_base_schema(api_table)
+                    output_table = next(table['name'] for table in tables['tables'] if table['id'] == table_name)
+                table.name = output_table
                 self.process_table(table, str(i))
         except HTTPError as err:
             self._handle_http_error(err)

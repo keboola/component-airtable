@@ -44,12 +44,29 @@
         }
       }
     },
-    "incremental_loading": {
+
+    "destination": {
+      "title": "Destination",
+      "type": "object",
       "propertyOrder": 70,
-      "title": "Incremental loading",
-      "type": "boolean",
-      "description": "Whether incremental loading should be used.",
-      "format": "checkbox"
+      "required": [
+        "incremental_loading"
+      ],
+      "properties": {
+        "table_name": {
+          "type": "string",
+          "title": "Storage Table Name",
+          "propertyOrder": 10,
+          "description": "Name of the destination table. System will supply source table name if not specified."
+        },
+        "incremental_loading": {
+        "propertyOrder": 20,
+        "title": "Incremental loading",
+        "type": "boolean",
+        "description": "Whether incremental loading should be used.",
+        "format": "checkbox"
+        }
+      }
     },
     "debug": {
       "propertyOrder": 80,
