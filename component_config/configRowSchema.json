@@ -60,11 +60,21 @@
           "description": "Name of the destination table. System will supply source table name if not specified."
         },
         "incremental_loading": {
-        "propertyOrder": 20,
-        "title": "Incremental loading",
-        "type": "boolean",
-        "description": "Whether incremental loading should be used.",
-        "format": "checkbox"
+          "enum": [
+              false,
+              true
+          ],
+          "type": "boolean",
+          "title": "Load Type",
+          "default": true,
+          "options": {
+              "enum_titles": [
+                  "Full Load",
+                  "Incremental Load"
+              ]
+          },
+          "description": "If Full load is used, the destination table will be overwritten every run. If Incremental Load is used, data will be upserted into the destination table.",
+          "propertyOrder": 20
         }
       }
     },
