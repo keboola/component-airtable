@@ -111,7 +111,7 @@ class Component(ComponentBase):
                     table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
                 )
                 if not output_table:
-                    # see comments in list_fields() why we must go throuch get_base_schema()
+                    # see comments in list_fields() why it is necessary to use get_base_schema()
                     tables = pyairtable.metadata.get_base_schema(api_table)
                     output_table = next(table['name'] for table in tables['tables'] if table['id'] == table_name)
                 table.name = output_table

@@ -60,7 +60,7 @@
           "type": "string",
           "title": "Storage Table Name",
           "propertyOrder": 10,
-          "description": "Name of the destination table. System will supply source table name if not specified."
+          "description": "Name of the destination table. Source table name will be used if not specified."
         },
         "incremental_loading": {
           "enum": [
@@ -80,13 +80,6 @@
           "propertyOrder": 20
         }
       }
-    },
-    "debug": {
-      "propertyOrder": 80,
-      "title": "Debug",
-      "type": "boolean",
-      "description": "When checked, logging will be more verbose",
-      "format": "checkbox"
     }
   }
 }
