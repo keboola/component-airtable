@@ -2,16 +2,15 @@ import logging
 import os
 from typing import Dict, List, Optional
 
+import pyairtable
+import pyairtable.metadata
 from keboola.component import ComponentBase
 from keboola.component.base import sync_action
 from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
-from requests import HTTPError
-
-import pyairtable
-import pyairtable.metadata
 from pyairtable import Api, Base, Table as ApiTable
+from requests import HTTPError
 
 from csv_tools import CachedOrthogonalDictWriter
 from transformation import Table, KeboolaDeleteWhereSpec
@@ -90,7 +89,7 @@ class Component(ComponentBase):
         table_name: str = params[KEY_TABLE_NAME]
         filter_by_formula: Optional[str] = params.get(KEY_FILTER_BY_FORMULA, None)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
-        self.incremental_loading: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOADING: True})\
+        self.incremental_loading: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOADING: True}) \
             .get(KEY_INCREMENTAL_LOADING)
         output_table: str = params.get(KEY_GROUP_DESTINATION, {KEY_TABLE_NAME: ''}).get(KEY_TABLE_NAME)
         self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
@@ -132,6 +131,18 @@ class Component(ComponentBase):
         bases = pyairtable.metadata.get_api_bases(api)
         resp = [dict(value=base['id'], label=f"{base['name']} ({base['id']})") for base in bases['bases']]
         return resp
+
+    @sync_action('testConnection')
+    def test_connection(self):
+        params: dict = self.configuration.parameters
+        api_key: str = params.get(KEY_API_KEY)
+        if not api_key:
+            raise UserException('API key or personal token missing')
+        api = Api(api_key)
+        try:
+            pyairtable.metadata.get_api_bases(api)
+        except Exception as e:
+            raise UserException("Login failed! Please check your API Token.") from e
 
     @sync_action('list_tables')
     def list_tables(self):

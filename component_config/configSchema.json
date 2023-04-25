@@ -1,16 +1,20 @@
 {
-      "title": "Airtable Credentials",
-      "type": "object",
-      "required": [
-            "#api_key"
-      ],
-      "properties": {
-            "#api_key": {
-                  "propertyOrder": 20,
-                  "title": "API key",
-                  "type": "string",
-                  "description": "The API key to authenticate the connection with Airtable.",
-                  "format": "password"
-            }
-      }
+  "title": "Airtable Credentials",
+  "type": "object",
+  "required": [
+    "#api_key"
+  ],
+  "properties": {
+    "#api_key": {
+      "propertyOrder": 20,
+      "title": "API key",
+      "type": "string",
+      "description": "The API key to authenticate the connection with Airtable.",
+      "format": "password"
+    },
+    "test_connection": {
+      "type": "button",
+      "format": "test-connection"
+    }
+  }
 }
