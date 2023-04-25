@@ -21,8 +21,12 @@
     },
     "filter_by_formula": {
       "propertyOrder": 50,
-      "default": "DATETIME_DIFF(NOW(), CREATED_TIME(), 'days') > 3",
       "title": "Filter by formula",
+      "options": {
+        "inputAttributes": {
+          "placeholder": "DATETIME_DIFF(NOW(), CREATED_TIME(), 'days') > 3"
+        }
+      },
       "type": "string",
       "description": "A predicate (expression that evaluates to true or false) Airtable field formula. For syntax refer <a href=\"https://support.airtable.com/hc/en-us/articles/203255215-Formula-Field-Reference\">here</a>"
     },
@@ -35,7 +39,7 @@
       "uniqueItems": true,
       "items": {
         "enum": [],
-		"type": "string"
+        "type": "string"
       },
       "options": {
         "async": {
@@ -44,7 +48,6 @@
         }
       }
     },
-
     "destination": {
       "title": "Destination",
       "type": "object",
@@ -61,17 +64,17 @@
         },
         "incremental_loading": {
           "enum": [
-              false,
-              true
+            false,
+            true
           ],
           "type": "boolean",
           "title": "Load Type",
           "default": true,
           "options": {
-              "enum_titles": [
-                  "Full Load",
-                  "Incremental Load"
-              ]
+            "enum_titles": [
+              "Full Load",
+              "Incremental Load"
+            ]
           },
           "description": "If Full load is used, the destination table will be overwritten every run. If Incremental Load is used, data will be upserted into the destination table.",
           "propertyOrder": 20
