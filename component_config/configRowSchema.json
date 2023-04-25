@@ -5,6 +5,20 @@
     "table_name"
   ],
   "properties": {
+    "base_id": {
+      "propertyOrder": 10,
+      "title": "Base ID",
+      "type": "string",
+      "enum": [],
+      "format": "select",
+      "options": {
+        "async": {
+          "label": "Re-load available base ids",
+          "action": "list_bases"
+        }
+      },
+      "description": "The ID of the base you want to extract tables from."
+    },
     "table_name": {
       "propertyOrder": 40,
       "title": "Table name",
