@@ -96,16 +96,17 @@ class Component(ComponentBase):
             KEY_TABLES_COLUMNS, {}
         )
 
-        api_table = pyairtable.Table(api_key, base_id, table_id)
-        destination_table_name = self._get_result_table_name(api_table, table_id)
-
-        logging.info(f"Downloading table: {destination_table_name}")
         api_options = {}
         if filter_by_formula:
             api_options["formula"] = filter_by_formula
         if fields:
             api_options["fields"] = fields
         try:
+            api_table = pyairtable.Table(api_key, base_id, table_id)
+            destination_table_name = self._get_result_table_name(api_table, table_id)
+
+            logging.info(f"Downloading table: {destination_table_name}")
+
             for i, record_batch in enumerate(api_table.iterate(**api_options)):
                 record_batch_processed = [process_record(r) for r in record_batch]
                 result_table = ResultTable.from_dicts(
@@ -243,7 +244,12 @@ class Component(ComponentBase):
     @staticmethod
     def _handle_http_error(error: HTTPError):
         json_message = error.response.json()["error"]
-        message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
+
+        if error.response.status_code == 401:
+            message = 'Request failed. Invalid credentials. Please verify your PAT token and the scopes allowed. ' \
+                      f'Detail: {json_message["type"]}, {json_message["message"]}'
+        else:
+            message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
         raise UserException(message) from error
 
     def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
