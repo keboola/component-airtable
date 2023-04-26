@@ -112,13 +112,15 @@ class Component(ComponentBase):
                     destination_table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
                 )
 
-                result_table.name = destination_table_name
-                self.process_table(result_table, str(i))
+                if result_table:
+                    self.process_table(result_table, str(i))
+                    self.finalize_all_tables()
+                    self.write_state_file(self.state)
+                else:
+                    logging.warning("The result is empty!")
+
         except HTTPError as err:
             self._handle_http_error(err)
-
-        self.finalize_all_tables()
-        self.write_state_file(self.state)
 
     @sync_action('list_bases')
     def list_bases(self):

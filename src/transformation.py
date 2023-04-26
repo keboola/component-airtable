@@ -84,10 +84,7 @@ class ResultTable:
             id_column_name: Optional[str] = None,
     ):
         if len(dicts) < 1:
-            raise ValueError(
-                f"Requested table is empty, Cannot handle empty tables."
-                f' Please, make sure that table "{name}" contains at least one record.'
-            )
+            return None
         if not id_column_name:
             id_column_name = COMPUTED_ID_COLUMN_NAME
         table = cls(name=name, id_column_name=id_column_name)
