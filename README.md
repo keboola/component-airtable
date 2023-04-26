@@ -13,30 +13,39 @@ This is an extractor that allows you to extract tables from Airtable bases.
 Prerequisites
 =============
 
-You must know your Airtable API key and ID of the base.
+Create Airtable PAT token.
 
-- You can obtain the API key from your [Airtable account overview page](https://airtable.com/account). Since read only access is sufficient, we recommend you create a read only account and provide its API key. For instructions how to do that, see the [this Airtable support article](https://support.airtable.com/hc/en-us/articles/360056249614).
-- To obtain the base ID, open your base API documentation from the [Airtable API documentation list](https://airtable.com/api) and find the base ID in your base's API documentation.
-
-You must also know the names of the tables in your Airtable base you want to extract. If you want to use filtering or download just a subset of the given table's fields (columns), you also need to provide the filter [formula](https://support.airtable.com/hc/en-us/articles/203255215-Formula-Field-Reference) and/or the names of the fields (columns) you want to download respectively.
+- You can create the PAT token in the [Airtable developer hub](https://airtable.com/account). Create read only access for following scopes: `data.records:read` and `schema.bases:read`
+- For more information about PAT tokens, see [the documentation](https://support.airtable.com/docs/creating-and-using-api-keys-and-access-tokens).
 
 
-<!-- Supported endpoints
-===================
-
-If you need more endpoints, please submit your request to
-[ideas.keboola.com](https://ideas.keboola.com/) -->
 
 Configuration
 =============
 
-## Configuration schema
+1. [Create a new configuration](https://help.keboola.com/components/#creating-component-configuration) of the Airtable
+   datasource.
+2. In the authorization section, enter the obtained PAT token. See prerequisites section.
+3. Create a new configuration row.
+
+4. Select `Base ID`. To reload available Bases click the `RELOAD AVAILABLE BASE IDS` button.
+5. Select `Table` you wish to Sync. To reload available tables for selected Base click the `RELOAD AVAILABLE TABLES`
+   button.
+6. Optionally, insert a custom `Filter Formula`. For syntax please refer [here](https://support.airtable.com/docs/formula-field-reference).
+   1. e.g. `DATETIME_DIFF(NOW(), CREATED_TIME(), 'minutes') < 130`
+7. Optionally, select subset of fields you wish to sync. If left empty, all fields are downloaded.
+8. Configure `Destination` section
+    1. Optionally, set the resulting `Storage Table Name`. If left empty, name of the source table will be automatically
+       used.
+    2. Select `Load Type`. If Full Load is used, the destination table will be overwritten every run. If Incremental
+       load is used, data will be "upserted" into the destination table.
+
+
+
+## Configuration parameters
  - Debug (debug) - [OPT] Whether you want to run the configuration in debug mode.
  - API key (#api_key) - [REQ] The API key to authenticate the connection with Airtable.
  - Base ID (base_id) - [REQ] The ID of the base you want to extract tables from.
-
-
-## Configuration row schema
  - Table name (table_name) - [REQ] The name of the table in Airtable base you want to download.
  - Filter by formula (filter_by_formula) - [OPT] A predicate (expression that evaluates to true or false) [Airtable field formula](https://support.airtable.com/hc/en-us/articles/203255215-Formula-Field-Reference).
  - Fields (fields) - [OPT] The fields you want to download. You may leave this empty to download all fields.

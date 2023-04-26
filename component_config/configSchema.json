@@ -7,9 +7,20 @@
   "properties": {
     "#api_key": {
       "propertyOrder": 20,
-      "title": "API key",
+      "title": "PAT token",
       "type": "string",
-      "description": "The API key to authenticate the connection with Airtable.",
+      "description": "A valid Airtable PAT token with required read only scopes (`data.records:read`, `schema.bases:read`)",
+
+            "links": [
+                {
+                    "rel": "Create PAT token here",
+                    "href": "https://airtable.com/create/tokens"
+                },
+                {
+                    "rel": "Additional documentation",
+                    "href": "https://support.airtable.com/docs/creating-and-using-api-keys-and-access-tokens"
+                }
+            ],
       "format": "password"
     },
     "test_connection": {

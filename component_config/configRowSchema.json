@@ -42,7 +42,7 @@
         }
       },
       "type": "string",
-      "description": "A predicate (expression that evaluates to true or false) Airtable field formula. For syntax refer <a href=\"https://support.airtable.com/hc/en-us/articles/203255215-Formula-Field-Reference\">here</a>"
+      "description": "Optional predicate (expression that evaluates to true or false) Airtable field formula. For syntax refer <a href=\"https://support.airtable.com/hc/en-us/articles/203255215-Formula-Field-Reference\">here</a>"
     },
     "fields": {
       "propertyOrder": 60,

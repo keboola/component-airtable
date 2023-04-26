@@ -1,36 +1,35 @@
+import hashlib
+import json
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
 from typing import Any, Callable, Dict, Optional, Union, Type, List, Set, MutableMapping
-import json
-import hashlib
 
 import typeguard
-
+from typeguard import TypeCheckError
 
 SUBOBJECT_SEP = "_"
 CHILD_TABLE_SEP = "__"
 COMPUTED_ID_COLUMN_NAME = "computed_id"
 PARENT_ID_COLUMN_NAME = "parent_id"
 
-
 ELEMENTARY_TYPE = Union[int, float, str, bool, NoneType]
 
 
 def is_type(val, type: Type) -> bool:
     try:
-        typeguard.check_type("val", val, type)
-    except TypeError:
+        typeguard.check_type(val, type)
+    except TypeCheckError:
         return False
     else:
         return True
 
 
 def flatten_dict(
-    dictionary: Dict,
-    parent_key: Optional[str] = None,
-    separator: str = SUBOBJECT_SEP,
-    flatten_lists: bool = False,
+        dictionary: Dict,
+        parent_key: Optional[str] = None,
+        separator: str = SUBOBJECT_SEP,
+        flatten_lists: bool = False,
 ):
     items = []
     for key, value in dictionary.items():
@@ -79,10 +78,10 @@ class Table:
 
     @classmethod
     def from_dicts(
-        cls,
-        name: str,
-        dicts: List[Dict[str, Any]],
-        id_column_name: Optional[str] = None,
+            cls,
+            name: str,
+            dicts: List[Dict[str, Any]],
+            id_column_name: Optional[str] = None,
     ):
         if len(dicts) < 1:
             raise ValueError(
