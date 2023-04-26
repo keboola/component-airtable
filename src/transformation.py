@@ -69,11 +69,11 @@ class ColumnType(Enum):
 
 
 @dataclass(slots=True)
-class Table:
+class ResultTable:
     name: str
     id_column_name: str
     rows: List[Dict[str, Any]] = field(default_factory=list)
-    child_tables: Dict[str, "Table"] = field(default_factory=dict)
+    child_tables: Dict[str, "ResultTable"] = field(default_factory=dict)
     delete_where_spec: Optional[KeboolaDeleteWhereSpec] = None
 
     @classmethod
@@ -124,6 +124,7 @@ class Table:
                         ),
                     ),
                 )
+                # this ugliness causes the Storage to delete existing child values in the KBC Storage.
                 for child_dict in value:
                     child_dict: Dict
                     child_dict[PARENT_ID_COLUMN_NAME] = parent_id = row_dict[
@@ -137,9 +138,8 @@ class Table:
         processed_dict = {}
         id_value = row_dict.get(  # Need to process the ID column first
             self.id_column_name,
-            hashlib.md5(
-                json.dumps(row_dict, sort_keys=True).encode("utf-8")
-            ).hexdigest(),  # If there is no ID column value, we use MD5 hash instead
+            hashlib.md5(json.dumps(row_dict, sort_keys=True).encode("utf-8")).hexdigest(),
+            # If there is no ID column value, we use MD5 hash instead
         )
         add_value_to_row(self.id_column_name, id_value, processed_dict)
         for column_name, value in row_dict.items():

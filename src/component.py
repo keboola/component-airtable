@@ -13,7 +13,7 @@ from pyairtable import Api, Base, Table as ApiTable
 from requests import HTTPError
 
 from csv_tools import CachedOrthogonalDictWriter
-from transformation import Table, KeboolaDeleteWhereSpec
+from transformation import ResultTable, KeboolaDeleteWhereSpec
 
 # Configuration variables
 KEY_API_KEY = "#api_key"
@@ -86,18 +86,20 @@ class Component(ComponentBase):
         # Access parameters in data/config.json
         api_key: str = params[KEY_API_KEY]
         base_id: str = params[KEY_BASE_ID]
-        table_name: str = params[KEY_TABLE_NAME]
+        table_id: str = params[KEY_TABLE_NAME]
         filter_by_formula: Optional[str] = params.get(KEY_FILTER_BY_FORMULA, None)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
         self.incremental_loading: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOADING: True}) \
             .get(KEY_INCREMENTAL_LOADING)
-        output_table: str = params.get(KEY_GROUP_DESTINATION, {KEY_TABLE_NAME: ''}).get(KEY_TABLE_NAME)
+
         self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
             KEY_TABLES_COLUMNS, {}
         )
 
-        api_table = pyairtable.Table(api_key, base_id, table_name)
+        api_table = pyairtable.Table(api_key, base_id, table_id)
+        destination_table_name = self._get_result_table_name(api_table, table_id)
 
+        logging.info(f"Downloading table: {destination_table_name}")
         api_options = {}
         if filter_by_formula:
             api_options["formula"] = filter_by_formula
@@ -106,15 +108,12 @@ class Component(ComponentBase):
         try:
             for i, record_batch in enumerate(api_table.iterate(**api_options)):
                 record_batch_processed = [process_record(r) for r in record_batch]
-                table = Table.from_dicts(
-                    table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
+                result_table = ResultTable.from_dicts(
+                    destination_table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
                 )
-                if not output_table:
-                    # see comments in list_fields() why it is necessary to use get_base_schema()
-                    tables = pyairtable.metadata.get_base_schema(api_table)
-                    output_table = next(table['name'] for table in tables['tables'] if table['id'] == table_name)
-                table.name = output_table
-                self.process_table(table, str(i))
+
+                result_table.name = destination_table_name
+                self.process_table(result_table, str(i))
         except HTTPError as err:
             self._handle_http_error(err)
 
@@ -169,7 +168,7 @@ class Component(ComponentBase):
             raise UserException('Base ID is missing')
         table_name: str = params.get(KEY_TABLE_NAME)
         if not table_name:
-            raise UserException('Table name is missing')
+            raise UserException('ResultTable name is missing')
         table = ApiTable(api_key, base_id, table_name)
         # we cannot use library method get_table_schema se it searches by table name
         #    fields = pyairtable.metadata.get_table_schema(table)
@@ -186,7 +185,7 @@ class Component(ComponentBase):
                 table_record.get('fields', [])]
         return resp
 
-    def process_table(self, table: Table, slice_name: str):
+    def process_table(self, table: ResultTable, slice_name: str):
         table.rename_columns(normalize_name)
         table.name = normalize_name(table.name)
 
@@ -244,6 +243,17 @@ class Component(ComponentBase):
         json_message = error.response.json()["error"]
         message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
         raise UserException(message) from error
+
+    def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
+
+        destination_name = self.configuration.parameters.get(KEY_GROUP_DESTINATION, {KEY_TABLE_NAME: ''}).get(
+            KEY_TABLE_NAME)
+
+        if not destination_name:
+            # see comments in list_fields() why it is necessary to use get_base_schema()
+            tables = pyairtable.metadata.get_base_schema(api_table)
+            destination_name = next(table['name'] for table in tables['tables'] if table['id'] == table_name)
+        return destination_name
 
 
 """

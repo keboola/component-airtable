@@ -84,7 +84,7 @@
           ],
           "type": "boolean",
           "title": "Load Type",
-          "default": true,
+          "default": false,
           "options": {
             "enum_titles": [
               "Full Load",
