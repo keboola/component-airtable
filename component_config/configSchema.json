@@ -9,18 +9,13 @@
       "propertyOrder": 20,
       "title": "PAT token",
       "type": "string",
-      "description": "A valid Airtable PAT token with required read only scopes (`data.records:read`, `schema.bases:read`)",
-
-            "links": [
-                {
-                    "rel": "Create PAT token here",
-                    "href": "https://airtable.com/create/tokens"
-                },
-                {
-                    "rel": "Additional documentation",
-                    "href": "https://support.airtable.com/docs/creating-and-using-api-keys-and-access-tokens"
-                }
-            ],
+      "description": "A valid Airtable PAT token with required read only scopes (`data.records:read`, `schema.bases:read`). <a href=\"https://support.airtable.com/docs/creating-and-using-api-keys-and-access-tokens\">Additional documentation</a<",
+      "links": [
+        {
+          "rel": "Create PAT token here",
+          "href": "https://airtable.com/create/tokens"
+        }
+      ],
       "format": "password"
     },
     "test_connection": {

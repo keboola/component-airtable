@@ -2,6 +2,7 @@
   "title": "Row configuration",
   "type": "object",
   "required": [
+    "base_id",
     "table_name"
   ],
   "properties": {
