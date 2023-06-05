@@ -12,7 +12,7 @@ from keboola.utils.header_normalizer import DefaultHeaderNormalizer
 from pyairtable import Api, Base, Table as ApiTable
 from requests import HTTPError
 
-from csv_tools import CachedOrthogonalDictWriter
+from keboola.csvwriter import ElasticDictWriter
 from transformation import ResultTable, KeboolaDeleteWhereSpec
 
 # Configuration variables
@@ -68,7 +68,7 @@ class Component(ComponentBase):
         super().__init__()
 
         self.table_definitions: Dict[str, TableDefinition] = {}
-        self.csv_writers: Dict[str, CachedOrthogonalDictWriter] = {}
+        self.csv_writers: Dict[str, ElasticDictWriter] = {}
         self.delete_where_specs: Dict[str, Optional[KeboolaDeleteWhereSpec]] = {}
         self.tables_columns = dict()
         self.incremental_loading: bool = False
@@ -115,13 +115,14 @@ class Component(ComponentBase):
 
                 if result_table:
                     self.process_table(result_table, str(i))
-                    self.finalize_all_tables()
-                    self.write_state_file(self.state)
                 else:
                     logging.warning("The result is empty!")
 
         except HTTPError as err:
             self._handle_http_error(err)
+
+        self.finalize_all_tables()
+        self.write_state_file(self.state)
 
     @sync_action('list_bases')
     def list_bases(self):
@@ -203,7 +204,7 @@ class Component(ComponentBase):
         )
         self.csv_writers[table.name] = csv_writer = self.csv_writers.get(
             table.name,
-            CachedOrthogonalDictWriter(
+            ElasticDictWriter(
                 file_path=f"{table_def.full_path}/{slice_name}.csv",
                 fieldnames=self.tables_columns.get(table.name, []),
             ),

@@ -5,3 +5,5 @@ keboola.http-client==1.0.0
 keboola.utils==1.1.0
 pyairtable==1.4.0
 typeguard==3.0.2
+keboola.csvwriter==1.0.1
+
