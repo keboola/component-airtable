@@ -209,15 +209,14 @@ class Component(ComponentBase):
                 fieldnames=self.tables_columns.get(table.name, []),
             ),
         )
-        self.delete_where_specs[
-            table.name
-        ] = delete_where_spec = self.delete_where_specs.get(
-            table.name, table.delete_where_spec
-        )
+
+        if self.incremental_loading:
+            self.delete_where_specs[table.name] = delete_where_spec = self.delete_where_specs.get(
+                table.name, table.delete_where_spec)
 
         os.makedirs(table_def.full_path, exist_ok=True)
         csv_writer.writerows(table.to_dicts())
-        if table.delete_where_spec:
+        if table.delete_where_spec and self.incremental_loading:
             assert table.delete_where_spec.column == delete_where_spec.column
             assert table.delete_where_spec.operator == delete_where_spec.operator
             delete_where_spec.values.update(table.delete_where_spec.values)
@@ -231,7 +230,7 @@ class Component(ComponentBase):
             table_def = self.table_definitions[table_name]
             self.tables_columns[table_name] = table_def.columns = csv_writer.fieldnames
             delete_where_spec = self.delete_where_specs[table_name]
-            if delete_where_spec:
+            if delete_where_spec and self.incremental_loading:
                 table_def.set_delete_where_from_dict(
                     {
                         "column": delete_where_spec.column,
