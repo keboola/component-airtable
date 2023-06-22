@@ -229,15 +229,15 @@ class Component(ComponentBase):
             csv_writer = self.csv_writers[table_name]
             table_def = self.table_definitions[table_name]
             self.tables_columns[table_name] = table_def.columns = csv_writer.fieldnames
-            delete_where_spec = self.delete_where_specs[table_name]
-            if delete_where_spec and self.incremental_loading:
-                table_def.set_delete_where_from_dict(
-                    {
-                        "column": delete_where_spec.column,
-                        "operator": delete_where_spec.operator,
-                        "values": list(delete_where_spec.values),
-                    }
-                )
+            if self.incremental_loading:
+                if delete_where_spec := self.delete_where_specs[table_name]:
+                    table_def.set_delete_where_from_dict(
+                        {
+                            "column": delete_where_spec.column,
+                            "operator": delete_where_spec.operator,
+                            "values": list(delete_where_spec.values),
+                        }
+                    )
             self.write_manifest(table_def)
             csv_writer.close()
 
