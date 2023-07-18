@@ -104,7 +104,8 @@ class ResultTable:
                     child_table_name,
                     self.__class__(
                         name=child_table_name,
-                        id_column_names=[ARRAY_OBJECTS_ID_FIELD_NAME, PARENT_ID_COLUMN_NAME]
+                        id_column_names=[
+                            ARRAY_OBJECTS_ID_FIELD_NAME, PARENT_ID_COLUMN_NAME]
                     ),
                 )
                 self.child_tables[child_table_name] = child_table
