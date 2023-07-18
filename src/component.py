@@ -302,8 +302,10 @@ class Component(ComponentBase):
         return parsed_date
 
     def _create_filter(self) -> str:
-        filter = (f"AND(IS_AFTER(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()),'{self._get_date_from()}'),"
-                  f"IS_BEFORE(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()), '{self._get_date_to()}'))"
+        filter = (f"AND(IS_AFTER(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()),"
+                  f"'{self._get_date_from()}'),"
+                  f"IS_BEFORE(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()),"
+                  f"'{self._get_date_to()}'))"
                   )
         return filter
 
