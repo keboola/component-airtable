@@ -1,8 +1,6 @@
 import logging
 import os
 from typing import Dict, List, Optional
-from dateutil.relativedelta import relativedelta
-from dateutil.parser import parse
 from datetime import datetime
 import dateparser
 
@@ -13,7 +11,6 @@ from keboola.component.base import sync_action
 from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
-from keboola.utils import parse_datetime_interval
 from pyairtable import Api, Base, Table as ApiTable
 from requests import HTTPError
 
@@ -115,7 +112,6 @@ class Component(ComponentBase):
         api_options = {}
         if self._fetching_is_incremental():
             api_options["formula"] = self._create_filter()
-            print(api_options)
         if fields:
             api_options["fields"] = fields
         try:
