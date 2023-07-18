@@ -139,7 +139,6 @@ class Component(ComponentBase):
         self.finalize_all_tables()
         self.write_state_file(self.state)
 
-
     @sync_action('list_bases')
     def list_bases(self):
         params: dict = self.configuration.parameters
@@ -260,7 +259,6 @@ class Component(ComponentBase):
         incremental = self._fetching_is_incremental()
         return self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_TO)) if incremental else None
 
-
     @staticmethod
     def _handle_http_error(error: HTTPError):
         json_message = error.response.json()["error"]
@@ -271,7 +269,6 @@ class Component(ComponentBase):
         else:
             message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
         raise UserException(message) from error
-
 
     def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
 
@@ -284,7 +281,6 @@ class Component(ComponentBase):
             destination_name = next(
                 table['name'] for table in tables['tables'] if table['id'] == table_name)
         return destination_name
-
 
     def _get_parsed_date(self, date_input: Optional[str]) -> Optional[str]:
         if not date_input:
@@ -306,9 +302,11 @@ class Component(ComponentBase):
         return parsed_date
 
     def _create_filter(self) -> str:
-        return f"AND(IS_AFTER(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()), '{self._get_date_from()}'), IS_BEFORE(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()), '{self._get_date_to()}'))"
-
-
+        filter = (f"AND(IS_AFTER(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()),'{self._get_date_from()}'),"
+                f"IS_BEFORE(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()), '{self._get_date_to()}'))"
+        )
+        return 
+    
 """
         Main entrypoint
 """
