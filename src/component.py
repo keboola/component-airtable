@@ -39,7 +39,7 @@ KEY_TABLES_COLUMNS = "tables_columns"
 # list of mandatory parameters => if some is missing,
 # component will fail with readable message on initialization.
 REQUIRED_PARAMETERS = [KEY_API_KEY, KEY_BASE_ID,
-                       KEY_TABLE_NAME, KEY_SYNC_OPTIONS]
+                       KEY_TABLE_NAME]
 REQUIRED_IMAGE_PARS = []
 
 RECORD_CREATED_TIME_FIELD_NAME = "record_created_time"
