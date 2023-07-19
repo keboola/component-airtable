@@ -35,7 +35,7 @@ def flatten_dict(
     for key, value in dictionary.items():
         new_key = str(parent_key) + separator + key if parent_key else key
         if isinstance(value, MutableMapping):
-            items.extend(flatten_dict(value, new_key, separator).items())
+            items.extend(flatten_dict(dict(value), new_key, separator).items())
         elif flatten_lists and isinstance(value, list):
             for k, v in enumerate(value):
                 items.extend(flatten_dict({str(k): v}, new_key).items())
@@ -73,7 +73,7 @@ class ResultTable:
             cls,
             name: str,
             dicts: List[Dict[str, Any]],
-            id_column_names: Optional[str] = RECORD_ID_FIELD_NAME,
+            id_column_names: List[str] = [RECORD_ID_FIELD_NAME]
     ):
         if len(dicts) < 1:
             return None

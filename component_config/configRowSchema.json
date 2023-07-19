@@ -72,7 +72,7 @@
             ]
           },
           "default": "full_sync",
-          "description": "Full Sync downloads all data from the source every run, Incremental Sync downloads data created or updated in a specified time range",
+          "description": "Full Sync downloads all data from the source every run. Incremental Sync downloads data created or updated in a specified time range by field CREATED_TIME() or LAST_MODIFIED_TIME(), fields are described in <a href='https://support.airtable.com/docs/formula-field-reference'>Airtable - Formula field reference</a>.",
           "propertyOrder": 10
         },
         "date_from": {

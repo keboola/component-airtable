@@ -1,7 +1,7 @@
 import logging
 import os
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime,timezone
 import dateparser
 
 import pyairtable
@@ -92,7 +92,7 @@ class Component(ComponentBase):
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         self.state = self.get_state_file()
         self.last_run = self.state.get(KEY_STATE_LAST_RUN, {}) or []
-        self.state[KEY_STATE_LAST_RUN] = datetime.now().strftime(
+        self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime(
             "%Y-%m-%d %H:%M:%S")
         self.date_from = self._get_date_from()
         self.date_to = self._get_date_to()
@@ -288,7 +288,7 @@ class Component(ComponentBase):
         elif date_input.lower() in ["last", "last run"] and self.last_run:
             parsed_date = dateparser.parse(self.last_run)
         elif date_input.lower() in ["now", "today"]:
-            parsed_date = datetime.now()
+            parsed_date = datetime.now(timezone.utc)
         elif date_input.lower() in ["last", "last run"] and not self.last_run:
             parsed_date = dateparser.parse("1990-01-01")
         else:
@@ -302,11 +302,15 @@ class Component(ComponentBase):
         return parsed_date
 
     def _create_filter(self) -> str:
-        filter = (f"AND(IS_AFTER(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()),"
-                  f"'{self._get_date_from()}'),"
-                  f"IS_BEFORE(IF(NOT(LAST_MODIFIED_TIME()),CREATED_TIME(),LAST_MODIFIED_TIME()),"
-                  f"'{self._get_date_to()}'))"
-                  )
+        date_from = f"SET_TIMEZONE('{self._get_date_from()}','UTC')"
+        date_to = f"SET_TIMEZONE('{self._get_date_to()}','UTC')"
+        c_time = "SET_TIMEZONE(CREATED_TIME(),'UTC')"
+        l_time = "SET_TIMEZONE(LAST_MODIFIED_TIME(),'UTC')"
+        if_not = f"IF(NOT(LAST_MODIFIED_TIME()),{c_time},{l_time})"
+        after = f"IS_AFTER({if_not},{date_from})"
+        before = f"IS_BEFORE({if_not},{date_to})"
+        filter = f"AND({after},{before})"
+        print(filter)
         return filter
 
 
