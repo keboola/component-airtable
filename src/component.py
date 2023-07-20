@@ -310,7 +310,6 @@ class Component(ComponentBase):
         after = f"IS_AFTER({if_not},{date_from})"
         before = f"IS_BEFORE({if_not},{date_to})"
         filter = f"AND({after},{before})"
-        print(filter)
         return filter
 
 
