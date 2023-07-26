@@ -21,7 +21,7 @@
       "description": "The ID of the base you want to extract tables from."
     },
     "table_name": {
-      "propertyOrder": 40,
+      "propertyOrder": 20,
       "title": "Table name",
       "type": "string",
       "enum": [],
@@ -34,19 +34,8 @@
       },
       "description": "The name of the table in Airtable base you want to download."
     },
-    "filter_by_formula": {
-      "propertyOrder": 50,
-      "title": "Filter by formula",
-      "options": {
-        "inputAttributes": {
-          "placeholder": "DATETIME_DIFF(NOW(), CREATED_TIME(), 'days') > 3"
-        }
-      },
-      "type": "string",
-      "description": "Optional predicate (expression that evaluates to true or false) Airtable field formula. For syntax refer <a href=\"https://support.airtable.com/hc/en-us/articles/203255215-Formula-Field-Reference\">here</a>. Example: 'DATETIME_DIFF(NOW(), CREATED_TIME(), 'days') > 3'"
-    },
     "fields": {
-      "propertyOrder": 60,
+      "propertyOrder": 30,
       "title": "Fields",
       "type": "array",
       "description": "The fields you want to download. You may leave this empty to download all fields.",
@@ -60,6 +49,55 @@
         "async": {
           "label": "Re-load available columns",
           "action": "list_fields"
+        }
+      }
+    },
+    "sync_options": {
+      "type": "object",
+      "title": "Sync Options",
+      "propertyOrder": 40,
+      "properties": {
+        "sync_mode": {
+          "type": "string",
+          "required": true,
+          "title": "Sync Mode",
+          "enum": [
+            "full_sync",
+            "incremental_sync"
+          ],
+          "options": {
+            "enum_titles": [
+              "Full Sync",
+              "Incremental Sync"
+            ]
+          },
+          "default": "full_sync",
+          "description": "Full Sync downloads all data from the source every run. Incremental Sync downloads data created or updated in a specified time range by field CREATED_TIME() or LAST_MODIFIED_TIME(), fields are described in <a href='https://support.airtable.com/docs/formula-field-reference'>Airtable - Formula field reference</a>.",
+          "propertyOrder": 10
+        },
+        "date_from": {
+          "type": "string",
+          "title": "Date From",
+          "default": "last run",
+          "description": "Date from which data is downloaded. Either date in YYYY-MM-DD format or dateparser string i.e. 5 days ago, 1 month ago, yesterday, etc. You can also set this as last run, which will fetch data from the last run of the component.",
+          "propertyOrder": 20,
+          "options": {
+            "dependencies": {
+              "sync_mode": "incremental_sync"
+            }
+          }
+        },
+        "date_to": {
+          "type": "string",
+          "title": "Date to",
+          "default": "now",
+          "description": "Date to which data is downloaded. Either date in YYYY-MM-DD format or dateparser string i.e. 5 days ago, 1 month ago, now, etc.",
+          "propertyOrder": 30,
+          "options": {
+            "dependencies": {
+              "sync_mode": "incremental_sync"
+            }
+          }
         }
       }
     },

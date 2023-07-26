@@ -1,6 +1,8 @@
 import logging
 import os
 from typing import Dict, List, Optional
+from datetime import datetime, timezone
+import dateparser
 
 import pyairtable
 import pyairtable.metadata
@@ -13,26 +15,33 @@ from pyairtable import Api, Base, Table as ApiTable
 from requests import HTTPError
 
 from keboola.csvwriter import ElasticDictWriter
-from transformation import ResultTable, KeboolaDeleteWhereSpec
+from transformation import ResultTable, RECORD_ID_FIELD_NAME
 
 # Configuration variables
 KEY_API_KEY = "#api_key"
 KEY_BASE_ID = "base_id"
 KEY_TABLE_NAME = "table_name"
-KEY_FILTER_BY_FORMULA = "filter_by_formula"
 KEY_FIELDS = "fields"
-KEY_INCREMENTAL_LOADING = "incremental_loading"
+KEY_INCREMENTAL_LOAD = "incremental_loading"
 KEY_GROUP_DESTINATION = "destination"
 
+# Sync options variables
+KEY_SYNC_OPTIONS = "sync_options"
+KEY_SYNC_MODE = "sync_mode"
+KEY_SYNC_MODE_INCREMENTAL = "incremental_sync"
+KEY_SYNC_DATE_FROM = "date_from"
+KEY_SYNC_DATE_TO = "date_to"
+
 # State variables
+KEY_STATE_LAST_RUN = "last_run"
 KEY_TABLES_COLUMNS = "tables_columns"
 
 # list of mandatory parameters => if some is missing,
 # component will fail with readable message on initialization.
-REQUIRED_PARAMETERS = [KEY_API_KEY, KEY_BASE_ID, KEY_TABLE_NAME]
+REQUIRED_PARAMETERS = [KEY_API_KEY, KEY_BASE_ID,
+                       KEY_TABLE_NAME]
 REQUIRED_IMAGE_PARS = []
 
-RECORD_ID_FIELD_NAME = "record_id"
 RECORD_CREATED_TIME_FIELD_NAME = "record_created_time"
 
 SUB = "_"
@@ -69,9 +78,9 @@ class Component(ComponentBase):
 
         self.table_definitions: Dict[str, TableDefinition] = {}
         self.csv_writers: Dict[str, ElasticDictWriter] = {}
-        self.delete_where_specs: Dict[str, Optional[KeboolaDeleteWhereSpec]] = {}
         self.tables_columns = dict()
-        self.incremental_loading: bool = False
+        self.incremental_destination: bool = False
+        self.last_run = int()
         self.state = dict()
 
     def run(self):
@@ -82,35 +91,41 @@ class Component(ComponentBase):
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         self.state = self.get_state_file()
+        self.last_run = self.state.get(KEY_STATE_LAST_RUN, {}) or []
+        self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S")
+        self.date_from = self._get_date_from()
+        self.date_to = self._get_date_to()
+        self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
+            KEY_TABLES_COLUMNS, {}
+        )
+
         params: dict = self.configuration.parameters
         # Access parameters in data/config.json
         api_key: str = params[KEY_API_KEY]
         base_id: str = params[KEY_BASE_ID]
         table_id: str = params[KEY_TABLE_NAME]
-        filter_by_formula: Optional[str] = params.get(KEY_FILTER_BY_FORMULA, None)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
-        self.incremental_loading: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOADING: True}) \
-            .get(KEY_INCREMENTAL_LOADING)
-
-        self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
-            KEY_TABLES_COLUMNS, {}
-        )
+        self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}) \
+            .get(KEY_INCREMENTAL_LOAD)
 
         api_options = {}
-        if filter_by_formula:
-            api_options["formula"] = filter_by_formula
+        if self._fetching_is_incremental():
+            api_options["formula"] = self._create_filter()
         if fields:
             api_options["fields"] = fields
         try:
             api_table = pyairtable.Table(api_key, base_id, table_id)
-            destination_table_name = self._get_result_table_name(api_table, table_id)
+            destination_table_name = self._get_result_table_name(
+                api_table, table_id)
 
             logging.info(f"Downloading table: {destination_table_name}")
-
             for i, record_batch in enumerate(api_table.iterate(**api_options)):
-                record_batch_processed = [process_record(r) for r in record_batch]
+                record_batch_processed = [
+                    process_record(r) for r in record_batch]
                 result_table = ResultTable.from_dicts(
-                    destination_table_name, record_batch_processed, id_column_name=RECORD_ID_FIELD_NAME
+                    destination_table_name, record_batch_processed, id_column_names=[
+                        RECORD_ID_FIELD_NAME]
                 )
 
                 if result_table:
@@ -132,7 +147,8 @@ class Component(ComponentBase):
             raise UserException('API key or personal token missing')
         api = Api(api_key)
         bases = pyairtable.metadata.get_api_bases(api)
-        resp = [dict(value=base['id'], label=f"{base['name']} ({base['id']})") for base in bases['bases']]
+        resp = [dict(
+            value=base['id'], label=f"{base['name']} ({base['id']})") for base in bases['bases']]
         return resp
 
     @sync_action('testConnection')
@@ -145,7 +161,8 @@ class Component(ComponentBase):
         try:
             pyairtable.metadata.get_api_bases(api)
         except Exception as e:
-            raise UserException("Login failed! Please check your API Token.") from e
+            raise UserException(
+                "Login failed! Please check your API Token.") from e
 
     @sync_action('list_tables')
     def list_tables(self):
@@ -158,7 +175,8 @@ class Component(ComponentBase):
             raise UserException('Base ID is missing')
         base = Base(api_key, base_id)
         tables = pyairtable.metadata.get_base_schema(base)
-        resp = [dict(value=table['id'], label=f"{table['name']} ({table['id']})") for table in tables['tables']]
+        resp = [dict(
+            value=table['id'], label=f"{table['name']} ({table['id']})") for table in tables['tables']]
         return resp
 
     @sync_action('list_fields')
@@ -197,8 +215,8 @@ class Component(ComponentBase):
             table.name,
             self.create_out_table_definition(
                 name=f"{table.name}.csv",
-                incremental=self.incremental_loading,
-                primary_key=[table.id_column_name],
+                incremental=self.incremental_destination,
+                primary_key=table.id_column_names,
                 is_sliced=True,
             ),
         )
@@ -209,17 +227,8 @@ class Component(ComponentBase):
                 fieldnames=self.tables_columns.get(table.name, []),
             ),
         )
-
-        if self.incremental_loading:
-            self.delete_where_specs[table.name] = delete_where_spec = self.delete_where_specs.get(
-                table.name, table.delete_where_spec)
-
         os.makedirs(table_def.full_path, exist_ok=True)
         csv_writer.writerows(table.to_dicts())
-        if table.delete_where_spec and self.incremental_loading:
-            assert table.delete_where_spec.column == delete_where_spec.column
-            assert table.delete_where_spec.operator == delete_where_spec.operator
-            delete_where_spec.values.update(table.delete_where_spec.values)
 
         for child_table in table.child_tables.values():
             self.process_table(child_table, slice_name)
@@ -229,17 +238,26 @@ class Component(ComponentBase):
             csv_writer = self.csv_writers[table_name]
             table_def = self.table_definitions[table_name]
             self.tables_columns[table_name] = table_def.columns = csv_writer.fieldnames
-            if self.incremental_loading:
-                if delete_where_spec := self.delete_where_specs[table_name]:
-                    table_def.set_delete_where_from_dict(
-                        {
-                            "column": delete_where_spec.column,
-                            "operator": delete_where_spec.operator,
-                            "values": list(delete_where_spec.values),
-                        }
-                    )
             self.write_manifest(table_def)
             csv_writer.close()
+
+    def _fetching_is_incremental(self) -> bool:
+        params = self.configuration.parameters
+        loading_options = params.get(KEY_SYNC_OPTIONS, {})
+        load_type = loading_options.get(KEY_SYNC_MODE)
+        return load_type == "incremental_sync"
+
+    def _get_date_from(self) -> Optional[str]:
+        params = self.configuration.parameters
+        loading_options = params.get(KEY_SYNC_OPTIONS, {})
+        incremental = self._fetching_is_incremental()
+        return self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_FROM)) if incremental else None
+
+    def _get_date_to(self) -> Optional[str]:
+        params = self.configuration.parameters
+        loading_options = params.get(KEY_SYNC_OPTIONS, {})
+        incremental = self._fetching_is_incremental()
+        return self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_TO)) if incremental else None
 
     @staticmethod
     def _handle_http_error(error: HTTPError):
@@ -260,8 +278,39 @@ class Component(ComponentBase):
         if not destination_name:
             # see comments in list_fields() why it is necessary to use get_base_schema()
             tables = pyairtable.metadata.get_base_schema(api_table)
-            destination_name = next(table['name'] for table in tables['tables'] if table['id'] == table_name)
+            destination_name = next(
+                table['name'] for table in tables['tables'] if table['id'] == table_name)
         return destination_name
+
+    def _get_parsed_date(self, date_input: Optional[str]) -> Optional[str]:
+        if not date_input:
+            parsed_date = None
+        elif date_input.lower() in ["last", "last run"] and self.last_run:
+            parsed_date = dateparser.parse(self.last_run)
+        elif date_input.lower() in ["now", "today"]:
+            parsed_date = datetime.now(timezone.utc)
+        elif date_input.lower() in ["last", "last run"] and not self.last_run:
+            parsed_date = dateparser.parse("1990-01-01")
+        else:
+            try:
+                parsed_date = dateparser.parse(date_input).date()
+            except (AttributeError, TypeError) as err:
+                raise UserException(
+                    f"Cannot parse date input {date_input}") from err
+        if parsed_date:
+            parsed_date = parsed_date.strftime("%Y-%m-%d %H:%M:%S")
+        return parsed_date
+
+    def _create_filter(self) -> str:
+        date_from = f"SET_TIMEZONE('{self._get_date_from()}','UTC')"
+        date_to = f"SET_TIMEZONE('{self._get_date_to()}','UTC')"
+        c_time = "SET_TIMEZONE(CREATED_TIME(),'UTC')"
+        l_time = "SET_TIMEZONE(LAST_MODIFIED_TIME(),'UTC')"
+        if_not = f"IF(NOT(LAST_MODIFIED_TIME()),{c_time},{l_time})"
+        after = f"IS_AFTER({if_not},{date_from})"
+        before = f"IS_BEFORE({if_not},{date_to})"
+        filter = f"AND({after},{before})"
+        return filter
 
 
 """
