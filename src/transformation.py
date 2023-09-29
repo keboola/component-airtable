@@ -85,7 +85,7 @@ class ResultTable:
     def add_row(self, row_dict: Dict[str, Any]):
 
         def add_value_to_row(column_name: str, value, row_dict: Dict[str, Any]):
-            if not value:
+            if value is None:
                 return
             column_type = ColumnType.from_example_value(value)
             if column_type is ColumnType.ELEMENTARY:
