@@ -55,6 +55,9 @@ class ColumnType(Enum):
     def from_example_value(cls, example_value):
         for t in cls:
             if is_type(example_value, t.value):
+                if t is ColumnType.ARRAY_OF_OBJECTS and 'id' not in example_value[0]:
+                    # ugly hack in case the object does not have id fallback to normal array.
+                    t = ColumnType.ARRAY_OF_ELEMENTARY
                 return t
         raise ValueError(
             f'Unexpected field data type. Got value of "{example_value}"'
@@ -99,7 +102,8 @@ class ResultTable:
                 row_dict[column_name] = json.dumps(
                     value
                 )  # TODO?: maybe create child table instead?
-            elif column_type is ColumnType.ARRAY_OF_OBJECTS:
+            elif column_type is ColumnType.ARRAY_OF_OBJECTS and 'id' in value[0]:
+
                 child_table_name = f"{self.name}{CHILD_TABLE_SEP}{column_name}"
                 child_table = self.child_tables.get(
                     child_table_name,
