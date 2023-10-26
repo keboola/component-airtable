@@ -1,4 +1,5 @@
 import json
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
@@ -121,7 +122,10 @@ class ResultTable:
         processed_dict = {}
         # first process ID columns
         for id_column in self.id_column_names:
-            id_value = row_dict[id_column]
+            try:
+                id_value = row_dict[id_column]
+            except KeyError:
+                logging.error(f"Error getting ID column for table {self.name} with record: {row_dict}")
             add_value_to_row(id_column, id_value, processed_dict)
         # next other columns
         for column_name, value in row_dict.items():
