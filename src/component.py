@@ -242,7 +242,7 @@ class Component(ComponentBase):
     @staticmethod
     def remove_non_utf8(row_dict):
         new_row = {}
-        for key, value in row_dict:
+        for key, value in row_dict.items():
             if isinstance(value, str):
                 new_row[key] = ''.join(i for i in value if ord(i) < 128)
 
