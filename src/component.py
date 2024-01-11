@@ -232,20 +232,28 @@ class Component(ComponentBase):
             try:
                 csv_writer.writerow(row)
             except UnicodeEncodeError:
+                logging.warning(f"Encountered Encoding Error, removing invalid characters for row: {row}")
                 new_row = self.remove_non_utf8(row)
-                logging.warning(f"Encountered Encoding Error, removing invalid characters for row: {row}\n"
-                                f"Resulting in row: {new_row}")
                 csv_writer.writerow(new_row)
 
         for child_table in table.child_tables.values():
             self.process_table(child_table, slice_name)
+
+    import logging
 
     @staticmethod
     def remove_non_utf8(row_dict):
         new_row = {}
         for key, value in row_dict.items():
             if isinstance(value, str):
-                new_row[key] = ''.join(i for i in value if ord(i) < 128)
+                original_value = value
+                new_value = ''.join(char for char in value if char.isprintable())
+
+                if original_value != new_value:
+                    logging.info(
+                        f"Replaced non-printable characters in key '{key}': '{original_value}' -> '{new_value}'")
+
+                new_row[key] = new_value
 
         return new_row
 
