@@ -11,7 +11,7 @@ from keboola.component.base import sync_action
 from keboola.component.dao import TableDefinition
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
-from pyairtable import Api, Base, Table as ApiTable
+from pyairtable import Api, Base, retry_strategy, Table as ApiTable
 from requests import HTTPError
 
 from keboola.csvwriter import ElasticDictWriter
@@ -114,19 +114,18 @@ class Component(ComponentBase):
             api_options["formula"] = self._create_filter()
         if fields:
             api_options["fields"] = fields
+
+        retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
+
         try:
-            api_table = pyairtable.Table(api_key, base_id, table_id)
-            destination_table_name = self._get_result_table_name(
-                api_table, table_id)
+            api_table = pyairtable.Table(api_key, base_id, table_id, retry_strategy=retry)
+            destination_table_name = self._get_result_table_name(api_table, table_id)
 
             logging.info(f"Downloading table: {destination_table_name}")
             for i, record_batch in enumerate(api_table.iterate(**api_options)):
-                record_batch_processed = [
-                    process_record(r) for r in record_batch]
-                result_table = ResultTable.from_dicts(
-                    destination_table_name, record_batch_processed, id_column_names=[
-                        RECORD_ID_FIELD_NAME]
-                )
+                record_batch_processed = [process_record(r) for r in record_batch]
+                result_table = ResultTable.from_dicts(destination_table_name, record_batch_processed,
+                                                      id_column_names=[RECORD_ID_FIELD_NAME])
 
                 if result_table:
                     self.process_table(result_table, str(i))
@@ -232,6 +231,10 @@ class Component(ComponentBase):
 
         for child_table in table.child_tables.values():
             self.process_table(child_table, slice_name)
+
+    @staticmethod
+    def remove_non_utf8(text):
+        return ''.join(i for i in text if ord(i) < 128)
 
     def finalize_all_tables(self):
         for table_name in self.csv_writers:
