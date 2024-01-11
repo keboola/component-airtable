@@ -232,8 +232,9 @@ class Component(ComponentBase):
             try:
                 csv_writer.writerow(row)
             except UnicodeEncodeError:
-                logging.warning(f"Encountered Encoding Error, removing invalid characters for row: {row}")
                 new_row = self.remove_non_utf8(row)
+                logging.warning(f"Encountered Encoding Error, removing invalid characters for row: {row}\n"
+                                f"Resulting in row: {new_row}")
                 csv_writer.writerow(new_row)
 
         for child_table in table.child_tables.values():
