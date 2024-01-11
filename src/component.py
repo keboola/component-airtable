@@ -227,14 +227,26 @@ class Component(ComponentBase):
             ),
         )
         os.makedirs(table_def.full_path, exist_ok=True)
-        csv_writer.writerows(table.to_dicts())
+
+        for row in table.to_dicts():
+            try:
+                csv_writer.writerow(row)
+            except UnicodeEncodeError:
+                logging.warning(f"Encountered Encoding Error, removing invalid characters for row: {row}")
+                new_row = self.remove_non_utf8(row)
+                csv_writer.writerow(new_row)
 
         for child_table in table.child_tables.values():
             self.process_table(child_table, slice_name)
 
     @staticmethod
-    def remove_non_utf8(text):
-        return ''.join(i for i in text if ord(i) < 128)
+    def remove_non_utf8(row_dict):
+        new_row = {}
+        for key, value in row_dict:
+            if isinstance(value, str):
+                new_row[key] = ''.join(i for i in value if ord(i) < 128)
+
+        return new_row
 
     def finalize_all_tables(self):
         for table_name in self.csv_writers:
