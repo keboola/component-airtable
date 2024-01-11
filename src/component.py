@@ -250,8 +250,7 @@ class Component(ComponentBase):
                 new_value = ''.join(char for char in value if char.isprintable())
 
                 if original_value != new_value:
-                    logging.info(
-                        f"Replaced non-printable characters in key '{key}': '{original_value}' -> '{new_value}'")
+                    logging.info(f"Removed non-printable characters for key '{key}': '{new_value}'")
 
                 new_row[key] = new_value
 
