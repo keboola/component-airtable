@@ -232,7 +232,6 @@ class Component(ComponentBase):
             try:
                 csv_writer.writerow(row)
             except UnicodeEncodeError:
-                logging.warning(f"Encountered Encoding Error, removing invalid characters for row: {row}")
                 new_row = self.remove_non_utf8(row)
                 csv_writer.writerow(new_row)
 
