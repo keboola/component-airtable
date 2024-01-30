@@ -98,6 +98,10 @@ class ResultTable:
                 row_dict[column_name] = json.dumps(
                     value
                 )  # TODO?: maybe create child table instead?
+            elif isinstance(value, list) and len(value) < 1:
+                row_dict[column_name] = ""
+            elif isinstance(value, list) and isinstance(value[0], dict) and value[0].get("error", None):
+                row_dict[column_name] = value[0].get("error")
             elif column_type is ColumnType.ARRAY_OF_OBJECTS:
                 child_table_name = f"{self.name}{CHILD_TABLE_SEP}{column_name}"
                 child_table = self.child_tables.get(
