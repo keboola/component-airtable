@@ -1,4 +1,5 @@
 import json
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
@@ -101,6 +102,7 @@ class ResultTable:
                     value
                 )  # TODO?: maybe create child table instead?
             elif column_type is ColumnType.ARRAY_OF_OBJECTS:
+                logging.info(f"DTYPE: {type(value)} VALUE: {value} COLUMN: {column_name}, DICT: {row_dict}")
                 child_table_name = f"{self.name}{CHILD_TABLE_SEP}{column_name}"
                 child_table = self.child_tables.get(
                     child_table_name,
