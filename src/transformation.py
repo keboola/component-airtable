@@ -88,10 +88,6 @@ class ResultTable:
         def add_value_to_row(column_name: str, value, row_dict: Dict[str, Any]):
             if value is None:
                 return
-            elif isinstance(value, list) and isinstance(value[0], dict) and value[0].get("error", None):
-                row_dict[column_name] = value[0].get("error")
-                return
-
             column_type = ColumnType.from_example_value(value)
             if column_type is ColumnType.ELEMENTARY:
                 row_dict[column_name] = value  # no need to do anything
@@ -103,6 +99,8 @@ class ResultTable:
                 row_dict[column_name] = json.dumps(
                     value
                 )  # TODO?: maybe create child table instead?
+            elif isinstance(value, list) and isinstance(value[0], dict) and value[0].get("error", None):
+                row_dict[column_name] = value[0].get("error")
             elif column_type is ColumnType.ARRAY_OF_OBJECTS:
                 logging.info(f"DTYPE: {type(value)} VALUE: {value} COLUMN: {column_name}, DICT: {row_dict}")
                 child_table_name = f"{self.name}{CHILD_TABLE_SEP}{column_name}"
