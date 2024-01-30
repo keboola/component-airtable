@@ -90,6 +90,8 @@ class ResultTable:
                 return
             elif isinstance(value, list) and isinstance(value[0], dict) and value[0].get("error", None):
                 row_dict[column_name] = value[0].get("error")
+                return
+
             column_type = ColumnType.from_example_value(value)
             if column_type is ColumnType.ELEMENTARY:
                 row_dict[column_name] = value  # no need to do anything
