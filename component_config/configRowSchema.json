@@ -34,6 +34,20 @@
       },
       "description": "The name of the table in Airtable base you want to download."
     },
+    "view_name": {
+      "propertyOrder": 25,
+      "title": "View name",
+      "type": "string",
+      "enum": [],
+      "format": "select",
+      "options": {
+        "async": {
+          "label": "Re-load available views",
+          "action": "list_views"
+        }
+      },
+      "description": "The name of the view in Airtable base you want to download. (OPTIONAL)"
+    },
     "fields": {
       "propertyOrder": 30,
       "title": "Fields",

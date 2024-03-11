@@ -21,6 +21,7 @@ from transformation import ResultTable, RECORD_ID_FIELD_NAME
 KEY_API_KEY = "#api_key"
 KEY_BASE_ID = "base_id"
 KEY_TABLE_NAME = "table_name"
+KEY_VIEW_NAME = "view_name"
 KEY_FIELDS = "fields"
 KEY_INCREMENTAL_LOAD = "incremental_loading"
 KEY_GROUP_DESTINATION = "destination"
@@ -105,6 +106,7 @@ class Component(ComponentBase):
         api_key: str = params[KEY_API_KEY]
         base_id: str = params[KEY_BASE_ID]
         table_id: str = params[KEY_TABLE_NAME]
+        view_id: Optional[str] = params[KEY_VIEW_NAME]
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
         self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}) \
             .get(KEY_INCREMENTAL_LOAD)
@@ -114,6 +116,8 @@ class Component(ComponentBase):
             api_options["formula"] = self._create_filter()
         if fields:
             api_options["fields"] = fields
+        if view_id:
+            api_options["view"] = view_id
 
         retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
 
@@ -137,74 +141,6 @@ class Component(ComponentBase):
 
         self.finalize_all_tables()
         self.write_state_file(self.state)
-
-    @sync_action('list_bases')
-    def list_bases(self):
-        params: dict = self.configuration.parameters
-        api_key: str = params.get(KEY_API_KEY)
-        if not api_key:
-            raise UserException('API key or personal token missing')
-        api = Api(api_key)
-        bases = pyairtable.metadata.get_api_bases(api)
-        resp = [dict(
-            value=base['id'], label=f"{base['name']} ({base['id']})") for base in bases['bases']]
-        return resp
-
-    @sync_action('testConnection')
-    def test_connection(self):
-        params: dict = self.configuration.parameters
-        api_key: str = params.get(KEY_API_KEY)
-        if not api_key:
-            raise UserException('API key or personal token missing')
-        api = Api(api_key)
-        try:
-            pyairtable.metadata.get_api_bases(api)
-        except Exception as e:
-            raise UserException(
-                "Login failed! Please check your API Token.") from e
-
-    @sync_action('list_tables')
-    def list_tables(self):
-        params: dict = self.configuration.parameters
-        api_key: str = params.get(KEY_API_KEY)
-        if not api_key:
-            raise UserException('API key or personal token is missing')
-        base_id: str = params.get(KEY_BASE_ID)
-        if not base_id:
-            raise UserException('Base ID is missing')
-        base = Base(api_key, base_id)
-        tables = pyairtable.metadata.get_base_schema(base)
-        resp = [dict(
-            value=table['id'], label=f"{table['name']} ({table['id']})") for table in tables['tables']]
-        return resp
-
-    @sync_action('list_fields')
-    def list_fields(self):
-        params: dict = self.configuration.parameters
-        api_key: str = params.get(KEY_API_KEY)
-        if not api_key:
-            raise UserException('API key or personal token is missing')
-        base_id: str = params.get(KEY_BASE_ID)
-        if not base_id:
-            raise UserException('Base ID is missing')
-        table_name: str = params.get(KEY_TABLE_NAME)
-        if not table_name:
-            raise UserException('ResultTable name is missing')
-        table = ApiTable(api_key, base_id, table_name)
-        # we cannot use library method get_table_schema se it searches by table name
-        #    fields = pyairtable.metadata.get_table_schema(table)
-        # we must use our own version searching for a table id
-        base_schema = pyairtable.metadata.get_base_schema(table)
-        table_record = None
-        for record in base_schema.get("tables", []):
-            if record["id"] == table_name:
-                table_record = record
-                break
-        if not table_record:
-            return []
-        resp = [dict(value=field['id'], label=f"{field['name']} ({field['id']})") for field in
-                table_record.get('fields', [])]
-        return resp
 
     def process_table(self, table: ResultTable, slice_name: str):
         table.rename_columns(normalize_name)
@@ -237,8 +173,6 @@ class Component(ComponentBase):
 
         for child_table in table.child_tables.values():
             self.process_table(child_table, slice_name)
-
-    import logging
 
     @staticmethod
     def remove_non_utf8(row_dict):
@@ -333,6 +267,84 @@ class Component(ComponentBase):
         before = f"IS_BEFORE({if_not},{date_to})"
         filter = f"AND({after},{before})"
         return filter
+
+    def _get_table_in_base_schema(self, ):
+        params: dict = self.configuration.parameters
+        api_key: str = params.get(KEY_API_KEY)
+        if not api_key:
+            raise UserException('API key or personal token is missing')
+        base_id: str = params.get(KEY_BASE_ID)
+        if not base_id:
+            raise UserException('Base ID is missing')
+        table_name: str = params.get(KEY_TABLE_NAME)
+        if not table_name:
+            raise UserException('ResultTable name is missing')
+        table = ApiTable(api_key, base_id, table_name)
+        base_schema = pyairtable.metadata.get_base_schema(table)
+        table_record = None
+        for record in base_schema.get("tables", []):
+            if record["id"] == table_name:
+                table_record = record
+                break
+        return table_record
+
+    def _list_table_attributes(self, key):
+        table = self._get_table_in_base_schema()
+        if not table:
+            return []
+        attributes = [dict(value=field['id'], label=f"{field['name']} ({field['id']})") for field in
+                      table.get(key, [])]
+        return attributes
+
+    @sync_action('list_fields')
+    def list_fields(self):
+        fields = self._list_table_attributes('fields')
+        return fields
+
+    @sync_action('list_views')
+    def list_views(self):
+        views = self._list_table_attributes('views')
+        return views
+
+    @sync_action('list_bases')
+    def list_bases(self):
+        params: dict = self.configuration.parameters
+        api_key: str = params.get(KEY_API_KEY)
+        if not api_key:
+            raise UserException('API key or personal token missing')
+        api = Api(api_key)
+        bases = pyairtable.metadata.get_api_bases(api)
+        resp = [dict(
+            value=base['id'], label=f"{base['name']} ({base['id']})") for base in bases['bases']]
+        return resp
+
+    @sync_action('testConnection')
+    def test_connection(self):
+        params: dict = self.configuration.parameters
+        api_key: str = params.get(KEY_API_KEY)
+        if not api_key:
+            raise UserException('API key or personal token missing')
+        api = Api(api_key)
+        try:
+            pyairtable.metadata.get_api_bases(api)
+        except Exception as e:
+            raise UserException(
+                "Login failed! Please check your API Token.") from e
+
+    @sync_action('list_tables')
+    def list_tables(self):
+        params: dict = self.configuration.parameters
+        api_key: str = params.get(KEY_API_KEY)
+        if not api_key:
+            raise UserException('API key or personal token is missing')
+        base_id: str = params.get(KEY_BASE_ID)
+        if not base_id:
+            raise UserException('Base ID is missing')
+        base = Base(api_key, base_id)
+        tables = pyairtable.metadata.get_base_schema(base)
+        resp = [dict(
+            value=table['id'], label=f"{table['name']} ({table['id']})") for table in tables['tables']]
+        return resp
 
 
 """
