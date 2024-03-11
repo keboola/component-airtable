@@ -58,7 +58,7 @@
         },
         "dependencies": {"use_view": true}
       },
-      "description": "The name of the view in Airtable base you want to download. (OPTIONAL)"
+      "description": "The name of the view in Airtable base you want to download."
     },
     "fields": {
       "propertyOrder": 30,
