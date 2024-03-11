@@ -21,6 +21,7 @@ from transformation import ResultTable, RECORD_ID_FIELD_NAME
 KEY_API_KEY = "#api_key"
 KEY_BASE_ID = "base_id"
 KEY_TABLE_NAME = "table_name"
+KEY_USE_VIEW = 'use_view'
 KEY_VIEW_NAME = "view_name"
 KEY_FIELDS = "fields"
 KEY_INCREMENTAL_LOAD = "incremental_loading"
@@ -106,7 +107,7 @@ class Component(ComponentBase):
         api_key: str = params[KEY_API_KEY]
         base_id: str = params[KEY_BASE_ID]
         table_id: str = params[KEY_TABLE_NAME]
-        view_id: Optional[str] = params[KEY_VIEW_NAME]
+        view_id: Optional[str] = params.get(KEY_VIEW_NAME)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
         self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}) \
             .get(KEY_INCREMENTAL_LOAD)
