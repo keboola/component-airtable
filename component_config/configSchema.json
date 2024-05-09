@@ -7,7 +7,7 @@
   "properties": {
     "#api_key": {
       "propertyOrder": 20,
-      "title": "PAT token",
+      "title": "Personal Access Token (PAT)",
       "type": "string",
       "description": "A valid Airtable PAT token with required read only scopes (`data.records:read`, `schema.bases:read`). Learn more in the <a href=\"https://support.airtable.com/docs/creating-and-using-api-keys-and-access-tokens\">documentation</a<",
       "format": "password"

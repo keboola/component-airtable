@@ -15,7 +15,8 @@
       "options": {
         "async": {
           "label": "Re-load available base ids",
-          "action": "list_bases"
+          "action": "list_bases",
+          "autoload": []
         }
       },
       "description": "The ID of the base you want to extract tables from."
@@ -29,16 +30,41 @@
       "options": {
         "async": {
           "label": "Re-load available tables",
-          "action": "list_tables"
+          "action": "list_tables",
+          "autoload": ["parameters.base_id"]
         }
       },
       "description": "The name of the table in Airtable base you want to download."
+    },
+    "use_view": {
+      "type": "boolean",
+      "format": "checkbox",
+      "title": "Use View",
+      "description": "if checked - extraction is done from the view not the table itself",
+      "default": false,
+      "propertyOrder": 24
+    },
+    "view_name": {
+      "propertyOrder": 25,
+      "title": "View name",
+      "type": "string",
+      "enum": [],
+      "format": "select",
+      "options": {
+        "async": {
+          "label": "Re-load available views",
+          "action": "list_views",
+          "autoload": ["parameters.table_name"]
+        },
+        "dependencies": {"use_view": true}
+      },
+      "description": "The name of the view in Airtable base you want to download."
     },
     "fields": {
       "propertyOrder": 30,
       "title": "Fields",
       "type": "array",
-      "description": "The fields you want to download. You may leave this empty to download all fields.",
+      "description": "The fields you want to download. You may leave this empty to download all fields. Note: in case od use_view even hidden fields will be retrieved.",
       "format": "select",
       "uniqueItems": true,
       "items": {
@@ -48,7 +74,8 @@
       "options": {
         "async": {
           "label": "Re-load available columns",
-          "action": "list_fields"
+          "action": "list_fields",
+          "autoload": ["parameters.table_name"]
         }
       }
     },
