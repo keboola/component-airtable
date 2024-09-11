@@ -5,6 +5,7 @@ from types import NoneType
 from typing import Any, Callable, Dict, Optional, Union, Type, List, MutableMapping
 
 import typeguard
+from keboola.component import UserException
 from typeguard import TypeCheckError
 
 SUBOBJECT_SEP = "_"
@@ -118,16 +119,19 @@ class ResultTable:
             else:
                 raise ValueError(f"Invalid column data type: {column_type}.")
 
-        processed_dict = {}
-        # first process ID columns
-        for id_column in self.id_column_names:
-            id_value = row_dict[id_column]
-            add_value_to_row(id_column, id_value, processed_dict)
-        # next other columns
-        for column_name, value in row_dict.items():
-            if column_name not in self.id_column_names:
-                add_value_to_row(column_name, value, processed_dict)
-        self.rows.append(processed_dict)
+        try:
+            processed_dict = {}
+            # first process ID columns
+            for id_column in self.id_column_names:
+                id_value = row_dict[id_column]
+                add_value_to_row(id_column, id_value, processed_dict)
+            # next other columns
+            for column_name, value in row_dict.items():
+                if column_name not in self.id_column_names:
+                    add_value_to_row(column_name, value, processed_dict)
+            self.rows.append(processed_dict)
+        except Exception as e:
+            raise UserException(f"Error while processing table: {self.name} row: {row_dict}. {e}")
 
     def rename_columns(self, rename_function: Callable[[str], str]):
         self.rows = [
