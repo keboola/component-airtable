@@ -26,10 +26,10 @@ def is_type(val, type: Type) -> bool:
 
 
 def flatten_dict(
-        dictionary: Dict,
-        parent_key: Optional[str] = None,
-        separator: str = SUBOBJECT_SEP,
-        flatten_lists: bool = False,
+    dictionary: Dict,
+    parent_key: Optional[str] = None,
+    separator: str = SUBOBJECT_SEP,
+    flatten_lists: bool = False,
 ):
     items = []
     for key, value in dictionary.items():
@@ -70,10 +70,10 @@ class ResultTable:
 
     @classmethod
     def from_dicts(
-            cls,
-            name: str,
-            dicts: List[Dict[str, Any]],
-            id_column_names: List[str] = [RECORD_ID_FIELD_NAME]
+        cls,
+        name: str,
+        dicts: List[Dict[str, Any]],
+        id_column_names: List[str] = [RECORD_ID_FIELD_NAME],
     ):
         if len(dicts) < 1:
             return None
@@ -100,7 +100,11 @@ class ResultTable:
                 )  # TODO?: maybe create child table instead?
             elif isinstance(value, list) and len(value) < 1:
                 row_dict[column_name] = ""
-            elif isinstance(value, list) and isinstance(value[0], dict) and value[0].get("error", None):
+            elif (
+                isinstance(value, list)
+                and isinstance(value[0], dict)
+                and value[0].get("error", None)
+            ):
                 row_dict[column_name] = value[0].get("error")
             elif column_type is ColumnType.ARRAY_OF_OBJECTS:
                 child_table_name = f"{self.name}{CHILD_TABLE_SEP}{column_name}"
@@ -109,7 +113,9 @@ class ResultTable:
                     self.__class__(
                         name=child_table_name,
                         id_column_names=[
-                            ARRAY_OBJECTS_ID_FIELD_NAME, PARENT_ID_COLUMN_NAME]
+                            ARRAY_OBJECTS_ID_FIELD_NAME,
+                            PARENT_ID_COLUMN_NAME,
+                        ],
                     ),
                 )
                 self.child_tables[child_table_name] = child_table
@@ -117,7 +123,9 @@ class ResultTable:
                 for child_dict in value:
                     child_dict: Dict
                     if RECORD_ID_FIELD_NAME in row_dict:
-                        child_dict[PARENT_ID_COLUMN_NAME] = row_dict[RECORD_ID_FIELD_NAME]
+                        child_dict[PARENT_ID_COLUMN_NAME] = row_dict[
+                            RECORD_ID_FIELD_NAME
+                        ]
                     child_table.add_row(child_dict)
             else:
                 raise ValueError(f"Invalid column data type: {column_type}.")

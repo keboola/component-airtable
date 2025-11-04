@@ -1,12 +1,12 @@
 [project]
 name = "component-airtable"
 version = "0.1.0"
-description = "Add your description here"
+description = "Extractor for Airtable tables"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "freezegun==1.2.2",
-    "keboola-component==1.4.3",
+    "keboola-component>=1.6.10",
     "keboola-csvwriter==1.0.1",
     "keboola-http-client==1.0.0",
     "keboola-utils==1.1.0",

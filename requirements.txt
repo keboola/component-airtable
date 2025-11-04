@@ -1,9 +1,0 @@
-mock==5.0.2
-freezegun==1.2.2
-keboola.component==1.4.3
-keboola.http-client==1.0.0
-keboola.utils==1.1.0
-pyairtable==1.4.0
-typeguard==3.0.2
-keboola.csvwriter==1.0.1
-
