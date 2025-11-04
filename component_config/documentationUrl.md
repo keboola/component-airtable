@@ -1,0 +1,1 @@
+https://github.com/keboola/component-airtable/blob/master/README.md
