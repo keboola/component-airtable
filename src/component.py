@@ -213,9 +213,7 @@ class Component(ComponentBase):
         table.name = normalize_name(table.name)
 
         # Create schema using Airtable metadata
-        schema = None
-        if api_table:
-            schema = self._create_keboola_schema(table.name, api_table)
+        schema = self._create_keboola_schema(table.name, api_table)
 
         self.table_definitions[table.name] = table_def = self.table_definitions.get(
             table.name,
@@ -242,10 +240,6 @@ class Component(ComponentBase):
             except UnicodeEncodeError:
                 new_row = self.remove_non_utf8(row)
                 csv_writer.writerow(new_row)
-
-        for child_table in table.child_tables.values():
-            # Child tables don't have Airtable schema, so pass None
-            self.process_table(child_table, slice_name, None)
 
     @staticmethod
     def remove_non_utf8(row_dict):
