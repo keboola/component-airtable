@@ -5,7 +5,7 @@ description = "Extractor for Airtable tables"
 readme = "README.md"
 requires-python = "~=3.13.0"
 dependencies = [
-    "freezegun==1.2.2",
+    "freezegun>=1.5.1",
     "keboola-component>=1.6.10",
     "keboola-csvwriter==1.0.1",
     "keboola-http-client==1.0.0",
