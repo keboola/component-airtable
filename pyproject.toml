@@ -14,3 +14,10 @@ dependencies = [
     "pyairtable==1.4.0",
     "typeguard==3.0.2",
 ]
+
+[dependency-groups]
+dev = [
+    "black>=25.9.0",
+    "flake8>=7.3.0",
+    "ruff>=0.13.3",
+]
