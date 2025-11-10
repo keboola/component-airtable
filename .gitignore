@@ -8,6 +8,7 @@ __pycache__/
 /example/.pydevproject
 .devcontainer
 .venv
+.uv-cache
 
 # kbc datafolder
 /data

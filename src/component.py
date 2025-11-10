@@ -1,5 +1,4 @@
 import logging
-import os
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
@@ -99,14 +98,10 @@ class Component(ComponentBase):
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         self.state = self.get_state_file()
         self.last_run = self.state.get(KEY_STATE_LAST_RUN, {}) or []
-        self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         self.date_from = self._get_date_from()
         self.date_to = self._get_date_to()
-        self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
-            KEY_TABLES_COLUMNS, {}
-        )
+        self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(KEY_TABLES_COLUMNS, {})
 
         params: dict = self.configuration.parameters
         # Access parameters in data/config.json
@@ -115,9 +110,9 @@ class Component(ComponentBase):
         table_id: str = params[KEY_TABLE_NAME]
         view_id: Optional[str] = params.get(KEY_VIEW_NAME)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
-        self.incremental_destination: bool = params.get(
-            KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}
-        ).get(KEY_INCREMENTAL_LOAD)
+        self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}).get(
+            KEY_INCREMENTAL_LOAD
+        )
 
         api_options = {}
         if self._fetching_is_incremental():
@@ -127,14 +122,10 @@ class Component(ComponentBase):
         if view_id:
             api_options["view"] = view_id
 
-        retry = retry_strategy(
-            status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10
-        )
+        retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
 
         try:
-            api_table = pyairtable.Table(
-                api_key, base_id, table_id, retry_strategy=retry
-            )
+            api_table = pyairtable.Table(api_key, base_id, table_id, retry_strategy=retry)
             destination_table_name = self._get_result_table_name(api_table, table_id)
 
             logging.info(f"Downloading table: {destination_table_name}")
@@ -165,9 +156,7 @@ class Component(ComponentBase):
         try:
             table_id = api_table.table_name
             tables = pyairtable.metadata.get_base_schema(api_table)
-            table_name = next(
-                table["name"] for table in tables["tables"] if table["id"] == table_id
-            )
+            table_name = next(table["name"] for table in tables["tables"] if table["id"] == table_id)
 
             table_schema = pyairtable.metadata.get_table_schema(
                 pyairtable.Table(
@@ -198,9 +187,7 @@ class Component(ComponentBase):
                     data_types=BaseType(dtype=keboola_type), primary_key=False
                 )
 
-            logging.debug(
-                f"Created schema for table '{table_name}' with {len(schema)} columns"
-            )
+            logging.debug(f"Created schema for table '{table_name}' with {len(schema)} columns")
             return schema
         except Exception as e:
             logging.warning(f"Failed to create schema for table '{table_name}': {e}")
@@ -218,18 +205,14 @@ class Component(ComponentBase):
             return SupportedDataTypes.TIMESTAMP
         return SupportedDataTypes.STRING
 
-    def _augment_schema_with_table_data(
-        self, table: ResultTable, schema: OrderedDict
-    ) -> OrderedDict:
+    def _augment_schema_with_table_data(self, table: ResultTable, schema: OrderedDict) -> OrderedDict:
         """Extend schema with columns observed in the flattened table data."""
         for row in table.to_dicts():
             for column_name, value in row.items():
                 if column_name in schema or value is None:
                     continue
                 inferred_type = self._infer_type_from_value(value)
-                schema[column_name] = ColumnDefinition(
-                    data_types=BaseType(dtype=inferred_type), primary_key=False
-                )
+                schema[column_name] = ColumnDefinition(data_types=BaseType(dtype=inferred_type), primary_key=False)
         return schema
 
     def _store_table_columns(self, table_name: str, schema: OrderedDict):
@@ -238,9 +221,7 @@ class Component(ComponentBase):
             return
         self.tables_columns[table_name] = list(schema.keys())
 
-    def process_table(
-        self, table: ResultTable, api_table: pyairtable.Table = None
-    ):
+    def process_table(self, table: ResultTable, api_table: pyairtable.Table = None):
         table.rename_columns(normalize_name)
         table.name = normalize_name(table.name)
 
@@ -285,9 +266,7 @@ class Component(ComponentBase):
                 new_value = "".join(char for char in value if char.isprintable())
 
                 if original_value != new_value:
-                    logging.info(
-                        f"Removed non-printable characters for key '{key}': '{new_value}'"
-                    )
+                    logging.info(f"Removed non-printable characters for key '{key}': '{new_value}'")
 
                 new_row[key] = new_value
 
@@ -334,21 +313,13 @@ class Component(ComponentBase):
         params = self.configuration.parameters
         loading_options = params.get(KEY_SYNC_OPTIONS, {})
         incremental = self._fetching_is_incremental()
-        return (
-            self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_FROM))
-            if incremental
-            else None
-        )
+        return self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_FROM)) if incremental else None
 
     def _get_date_to(self) -> Optional[str]:
         params = self.configuration.parameters
         loading_options = params.get(KEY_SYNC_OPTIONS, {})
         incremental = self._fetching_is_incremental()
-        return (
-            self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_TO))
-            if incremental
-            else None
-        )
+        return self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_TO)) if incremental else None
 
     @staticmethod
     def _handle_http_error(error: HTTPError):
@@ -363,20 +334,16 @@ class Component(ComponentBase):
             message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
         raise UserException(message) from error
 
-    def _get_result_table_name(
-        self, api_table: pyairtable.Table, table_name: str
-    ) -> str:
+    def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
 
-        destination_name = self.configuration.parameters.get(
-            KEY_GROUP_DESTINATION, {KEY_TABLE_NAME: ""}
-        ).get(KEY_TABLE_NAME)
+        destination_name = self.configuration.parameters.get(KEY_GROUP_DESTINATION, {KEY_TABLE_NAME: ""}).get(
+            KEY_TABLE_NAME
+        )
 
         if not destination_name:
             # see comments in list_fields() why it is necessary to use get_base_schema()
             tables = pyairtable.metadata.get_base_schema(api_table)
-            destination_name = next(
-                table["name"] for table in tables["tables"] if table["id"] == table_name
-            )
+            destination_name = next(table["name"] for table in tables["tables"] if table["id"] == table_name)
         return destination_name
 
     def _get_parsed_date(self, date_input: Optional[str]) -> Optional[str]:
@@ -434,10 +401,7 @@ class Component(ComponentBase):
         table = self._get_table_in_base_schema()
         if not table:
             return []
-        attributes = [
-            dict(value=field["id"], label=f"{field['name']} ({field['id']})")
-            for field in table.get(key, [])
-        ]
+        attributes = [dict(value=field["id"], label=f"{field['name']} ({field['id']})") for field in table.get(key, [])]
         return attributes
 
     @sync_action("list_fields")
@@ -458,10 +422,7 @@ class Component(ComponentBase):
             raise UserException("API key or personal token missing")
         api = Api(api_key)
         bases = pyairtable.metadata.get_api_bases(api)
-        resp = [
-            dict(value=base["id"], label=f"{base['name']} ({base['id']})")
-            for base in bases["bases"]
-        ]
+        resp = [dict(value=base["id"], label=f"{base['name']} ({base['id']})") for base in bases["bases"]]
         return resp
 
     @sync_action("testConnection")
@@ -487,10 +448,7 @@ class Component(ComponentBase):
             raise UserException("Base ID is missing")
         base = Base(api_key, base_id)
         tables = pyairtable.metadata.get_base_schema(base)
-        resp = [
-            dict(value=table["id"], label=f"{table['name']} ({table['id']})")
-            for table in tables["tables"]
-        ]
+        resp = [dict(value=table["id"], label=f"{table['name']} ({table['id']})") for table in tables["tables"]]
         return resp
 
 
