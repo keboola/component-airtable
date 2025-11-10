@@ -6,6 +6,14 @@
     "table_name"
   ],
   "properties": {
+    "debug": {
+      "type": "boolean",
+      "title": "Debug mode",
+      "format": "checkbox",
+      "default": false,
+      "description": "If enabled, the component will produce more detailed logs",
+      "propertyOrder": 99
+    },
     "base_id": {
       "propertyOrder": 10,
       "title": "Base ID",
