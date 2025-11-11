@@ -149,7 +149,7 @@ class Component(ComponentBase):
         self.finalize_all_tables()
         self.write_state_file(self.state)
 
-    def _create_keboola_schema(self, table_id: str, api_table: pyairtable.Table):
+    def _create_keboola_schema(self, api_table: pyairtable.Table):
         """
         Create Keboola schema from Airtable table metadata
         """
