@@ -104,12 +104,12 @@ dev = [
 requires-dist = [
     { name = "freezegun", specifier = ">=1.5.1" },
     { name = "keboola-component", specifier = ">=1.6.10" },
-    { name = "keboola-csvwriter", specifier = "==1.0.1" },
-    { name = "keboola-http-client", specifier = "==1.0.0" },
-    { name = "keboola-utils", specifier = "==1.1.0" },
-    { name = "mock", specifier = "==5.0.2" },
+    { name = "keboola-csvwriter", specifier = ">=1.0.1" },
+    { name = "keboola-http-client", specifier = ">=1.0.0" },
+    { name = "keboola-utils", specifier = ">=1.1.0" },
+    { name = "mock", specifier = ">=5.0.2" },
     { name = "pyairtable", specifier = "==1.4.0" },
-    { name = "typeguard", specifier = "==3.0.2" },
+    { name = "typeguard", specifier = ">=3.0.2" },
 ]
 
 [package.metadata.requires-dev]

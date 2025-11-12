@@ -7,12 +7,12 @@ requires-python = "~=3.13.0"
 dependencies = [
     "freezegun>=1.5.1",
     "keboola-component>=1.6.10",
-    "keboola-csvwriter==1.0.1",
-    "keboola-http-client==1.0.0",
-    "keboola-utils==1.1.0",
-    "mock==5.0.2",
+    "keboola-csvwriter>=1.0.1",
+    "keboola-http-client>=1.0.0",
+    "keboola-utils>=1.1.0",
+    "mock>=5.0.2",
     "pyairtable==1.4.0",
-    "typeguard==3.0.2",
+    "typeguard>=3.0.2",
 ]
 
 [tool.black]

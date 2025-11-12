@@ -226,7 +226,7 @@ class Component(ComponentBase):
         table.name = normalize_name(table.name)
 
         # Create schema using Airtable metadata
-        schema = self._create_keboola_schema(table.name, api_table)
+        schema = self._create_keboola_schema(api_table)
         schema = self._augment_schema_with_table_data(table, schema)
         self._store_table_columns(table.name, schema)
 
@@ -247,7 +247,6 @@ class Component(ComponentBase):
                 fieldnames=self.tables_columns.get(table.name, []),
             ),
         )
-        # os.makedirs(table_def.full_path, exist_ok=True)
 
         csv_writer.writeheader()
         for row in table.to_dicts():
@@ -336,9 +335,7 @@ class Component(ComponentBase):
 
     def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
 
-        destination_name = self.configuration.parameters.get(KEY_GROUP_DESTINATION, {KEY_TABLE_NAME: ""}).get(
-            KEY_TABLE_NAME
-        )
+        destination_name = self.configuration.parameters.get(KEY_GROUP_DESTINATION, {}).get(KEY_TABLE_NAME, "")
 
         if not destination_name:
             # see comments in list_fields() why it is necessary to use get_base_schema()
@@ -375,9 +372,7 @@ class Component(ComponentBase):
         filter = f"AND({after},{before})"
         return filter
 
-    def _get_table_in_base_schema(
-        self,
-    ):
+    def _get_table_in_base_schema(self):
         params: dict = self.configuration.parameters
         api_key: str = params.get(KEY_API_KEY)
         if not api_key:

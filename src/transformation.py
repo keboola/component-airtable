@@ -55,10 +55,7 @@ class ColumnType(Enum):
         for t in cls:
             if is_type(example_value, t.value):
                 return t
-        raise ValueError(
-            f'Unexpected field data type. Got value of "{example_value}"'
-            f' as type "{type(example_value)}".'
-        )
+        raise ValueError(f'Unexpected field data type. Got value of "{example_value}" as type "{type(example_value)}".')
 
 
 @dataclass(slots=True)
@@ -95,16 +92,10 @@ class ResultTable:
                 for flattened_key, flattened_value in flattened_dict.items():
                     add_value_to_row(flattened_key, flattened_value, row_dict)
             elif column_type is ColumnType.ARRAY_OF_ELEMENTARY:
-                row_dict[column_name] = json.dumps(
-                    value
-                )  # TODO?: maybe create child table instead?
+                row_dict[column_name] = json.dumps(value)  # TODO?: maybe create child table instead?
             elif isinstance(value, list) and len(value) < 1:
                 row_dict[column_name] = ""
-            elif (
-                isinstance(value, list)
-                and isinstance(value[0], dict)
-                and value[0].get("error", None)
-            ):
+            elif isinstance(value, list) and isinstance(value[0], dict) and value[0].get("error", None):
                 row_dict[column_name] = value[0].get("error")
             elif column_type is ColumnType.ARRAY_OF_OBJECTS:
                 child_table_name = f"{self.name}{CHILD_TABLE_SEP}{column_name}"
@@ -123,9 +114,7 @@ class ResultTable:
                 for child_dict in value:
                     child_dict: Dict
                     if RECORD_ID_FIELD_NAME in row_dict:
-                        child_dict[PARENT_ID_COLUMN_NAME] = row_dict[
-                            RECORD_ID_FIELD_NAME
-                        ]
+                        child_dict[PARENT_ID_COLUMN_NAME] = row_dict[RECORD_ID_FIELD_NAME]
                     child_table.add_row(child_dict)
             else:
                 raise ValueError(f"Invalid column data type: {column_type}.")
@@ -142,9 +131,7 @@ class ResultTable:
         self.rows.append(processed_dict)
 
     def rename_columns(self, rename_function: Callable[[str], str]):
-        self.rows = [
-            {rename_function(k): v for k, v in row.items()} for row in self.rows
-        ]
+        self.rows = [{rename_function(k): v for k, v in row.items()} for row in self.rows]
 
     def to_dicts(self) -> List[Dict[str, Any]]:
         return self.rows

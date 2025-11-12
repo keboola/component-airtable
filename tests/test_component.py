@@ -1,14 +1,7 @@
-"""
-Created on 12. 11. 2018
-
-@author: esner
-"""
-
 import unittest
 import mock
 import os
 from freezegun import freeze_time
-
 from component import Component
 
 
