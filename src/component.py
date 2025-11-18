@@ -1,6 +1,6 @@
 import logging
-import os
-from typing import Dict, List, Optional
+from collections import OrderedDict
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 import dateparser
 
@@ -8,7 +8,12 @@ import pyairtable
 import pyairtable.metadata
 from keboola.component import ComponentBase
 from keboola.component.base import sync_action
-from keboola.component.dao import TableDefinition
+from keboola.component.dao import (
+    TableDefinition,
+    SupportedDataTypes,
+    ColumnDefinition,
+    BaseType,
+)
 from keboola.component.exceptions import UserException
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
 from pyairtable import Api, Base, retry_strategy, Table as ApiTable
@@ -21,7 +26,7 @@ from transformation import ResultTable, RECORD_ID_FIELD_NAME
 KEY_API_KEY = "#api_key"
 KEY_BASE_ID = "base_id"
 KEY_TABLE_NAME = "table_name"
-KEY_USE_VIEW = 'use_view'
+KEY_USE_VIEW = "use_view"
 KEY_VIEW_NAME = "view_name"
 KEY_FIELDS = "fields"
 KEY_INCREMENTAL_LOAD = "incremental_loading"
@@ -40,8 +45,7 @@ KEY_TABLES_COLUMNS = "tables_columns"
 
 # list of mandatory parameters => if some is missing,
 # component will fail with readable message on initialization.
-REQUIRED_PARAMETERS = [KEY_API_KEY, KEY_BASE_ID,
-                       KEY_TABLE_NAME]
+REQUIRED_PARAMETERS = [KEY_API_KEY, KEY_BASE_ID, KEY_TABLE_NAME]
 REQUIRED_IMAGE_PARS = []
 
 RECORD_CREATED_TIME_FIELD_NAME = "record_created_time"
@@ -94,13 +98,10 @@ class Component(ComponentBase):
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         self.state = self.get_state_file()
         self.last_run = self.state.get(KEY_STATE_LAST_RUN, {}) or []
-        self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime(
-            "%Y-%m-%d %H:%M:%S")
+        self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         self.date_from = self._get_date_from()
         self.date_to = self._get_date_to()
-        self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(
-            KEY_TABLES_COLUMNS, {}
-        )
+        self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(KEY_TABLES_COLUMNS, {})
 
         params: dict = self.configuration.parameters
         # Access parameters in data/config.json
@@ -109,8 +110,9 @@ class Component(ComponentBase):
         table_id: str = params[KEY_TABLE_NAME]
         view_id: Optional[str] = params.get(KEY_VIEW_NAME)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
-        self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}) \
-            .get(KEY_INCREMENTAL_LOAD)
+        self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}).get(
+            KEY_INCREMENTAL_LOAD
+        )
 
         api_options = {}
         if self._fetching_is_incremental():
@@ -127,15 +129,19 @@ class Component(ComponentBase):
             destination_table_name = self._get_result_table_name(api_table, table_id)
 
             logging.info(f"Downloading table: {destination_table_name}")
-            for i, record_batch in enumerate(api_table.iterate(**api_options)):
-                record_batch_processed = [process_record(r) for r in record_batch]
-                result_table = ResultTable.from_dicts(destination_table_name, record_batch_processed,
-                                                      id_column_names=[RECORD_ID_FIELD_NAME])
+            record_batch_processed = []
+            for record_batch in api_table.iterate(**api_options):
+                record_batch_processed.extend([process_record(r) for r in record_batch])
+            result_table = ResultTable.from_dicts(
+                destination_table_name,
+                record_batch_processed,
+                id_column_names=[RECORD_ID_FIELD_NAME],
+            )
 
-                if result_table:
-                    self.process_table(result_table, str(i))
-                else:
-                    logging.warning("The result is empty!")
+            if result_table:
+                self.process_table(result_table, api_table)
+            else:
+                logging.warning("The result is empty!")
 
         except HTTPError as err:
             self._handle_http_error(err)
@@ -143,9 +149,86 @@ class Component(ComponentBase):
         self.finalize_all_tables()
         self.write_state_file(self.state)
 
-    def process_table(self, table: ResultTable, slice_name: str):
+    def _create_keboola_schema(self, api_table: pyairtable.Table):
+        """
+        Create Keboola schema from Airtable table metadata
+        """
+        try:
+            table_id = api_table.table_name
+            tables = pyairtable.metadata.get_base_schema(api_table)
+            table_name = next(table["name"] for table in tables["tables"] if table["id"] == table_id)
+
+            table_schema = pyairtable.metadata.get_table_schema(
+                pyairtable.Table(
+                    api_key=self.configuration.parameters[KEY_API_KEY],
+                    base_id=self.configuration.parameters[KEY_BASE_ID],
+                    table_name=table_name,
+                )
+            )
+            schema = OrderedDict()
+
+            # Built-in fields
+            schema[normalize_name(RECORD_ID_FIELD_NAME)] = ColumnDefinition(
+                data_types=BaseType(dtype=SupportedDataTypes.STRING),
+                primary_key=True,
+                nullable=False,
+            )
+            schema[normalize_name(RECORD_CREATED_TIME_FIELD_NAME)] = ColumnDefinition(
+                data_types=BaseType(dtype=SupportedDataTypes.TIMESTAMP),
+                primary_key=False,
+            )
+
+            # Airtable fields
+            for field in table_schema.get("fields", []):
+                normalized_field_name = normalize_name(field.get("name", ""))
+                keboola_type = self._convert_airtable_type(field)
+
+                schema[normalized_field_name] = ColumnDefinition(
+                    data_types=BaseType(dtype=keboola_type), primary_key=False
+                )
+
+            logging.debug(f"Created schema for table '{table_name}' with {len(schema)} columns")
+            return schema
+        except Exception as e:
+            logging.warning(f"Failed to create schema for table '{table_name}': {e}")
+            return OrderedDict()
+
+    def _infer_type_from_value(self, value: Any) -> SupportedDataTypes:
+        """Infer Keboola base type from a sample Python value."""
+        if isinstance(value, bool):
+            return SupportedDataTypes.BOOLEAN
+        if isinstance(value, int):
+            return SupportedDataTypes.INTEGER
+        if isinstance(value, float):
+            return SupportedDataTypes.FLOAT
+        if isinstance(value, datetime):
+            return SupportedDataTypes.TIMESTAMP
+        return SupportedDataTypes.STRING
+
+    def _augment_schema_with_table_data(self, table: ResultTable, schema: OrderedDict) -> OrderedDict:
+        """Extend schema with columns observed in the flattened table data."""
+        for row in table.to_dicts():
+            for column_name, value in row.items():
+                if column_name in schema or value is None:
+                    continue
+                inferred_type = self._infer_type_from_value(value)
+                schema[column_name] = ColumnDefinition(data_types=BaseType(dtype=inferred_type), primary_key=False)
+        return schema
+
+    def _store_table_columns(self, table_name: str, schema: OrderedDict):
+        """Persist column order derived from the schema for later writer initialization."""
+        if not schema:
+            return
+        self.tables_columns[table_name] = list(schema.keys())
+
+    def process_table(self, table: ResultTable, api_table: pyairtable.Table = None):
         table.rename_columns(normalize_name)
         table.name = normalize_name(table.name)
+
+        # Create schema using Airtable metadata
+        schema = self._create_keboola_schema(api_table)
+        schema = self._augment_schema_with_table_data(table, schema)
+        self._store_table_columns(table.name, schema)
 
         self.table_definitions[table.name] = table_def = self.table_definitions.get(
             table.name,
@@ -153,18 +236,19 @@ class Component(ComponentBase):
                 name=f"{table.name}.csv",
                 incremental=self.incremental_destination,
                 primary_key=table.id_column_names,
-                is_sliced=True,
+                has_header=True,
+                schema=schema,  # Pass schema to enable native datatypes
             ),
         )
         self.csv_writers[table.name] = csv_writer = self.csv_writers.get(
             table.name,
             ElasticDictWriter(
-                file_path=f"{table_def.full_path}/{slice_name}.csv",
+                file_path=table_def.full_path,
                 fieldnames=self.tables_columns.get(table.name, []),
             ),
         )
-        os.makedirs(table_def.full_path, exist_ok=True)
 
+        csv_writer.writeheader()
         for row in table.to_dicts():
             try:
                 csv_writer.writerow(row)
@@ -172,16 +256,13 @@ class Component(ComponentBase):
                 new_row = self.remove_non_utf8(row)
                 csv_writer.writerow(new_row)
 
-        for child_table in table.child_tables.values():
-            self.process_table(child_table, slice_name)
-
     @staticmethod
     def remove_non_utf8(row_dict):
         new_row = {}
         for key, value in row_dict.items():
             if isinstance(value, str):
                 original_value = value
-                new_value = ''.join(char for char in value if char.isprintable())
+                new_value = "".join(char for char in value if char.isprintable())
 
                 if original_value != new_value:
                     logging.info(f"Removed non-printable characters for key '{key}': '{new_value}'")
@@ -190,11 +271,34 @@ class Component(ComponentBase):
 
         return new_row
 
+    @staticmethod
+    def _convert_airtable_type(field) -> SupportedDataTypes:
+        """Convert Airtable field type to Keboola SupportedDataTypes."""
+        field_options = field.get("options", {})
+        field_type = field.get("type", "")
+
+        if field_type in ["number", "currency", "percent"]:
+            precision = field_options.get("precision", 0)
+            if precision == 0:
+                return SupportedDataTypes.INTEGER
+            else:
+                return SupportedDataTypes.FLOAT
+        elif field_type in ["autoNumber", "count", "rating"]:
+            return SupportedDataTypes.INTEGER
+        elif field_type == "checkbox":
+            return SupportedDataTypes.BOOLEAN
+        elif field_type == "date":
+            return SupportedDataTypes.DATE
+        elif field_type in ["dateTime", "createdTime", "lastModifiedTime"]:
+            return SupportedDataTypes.TIMESTAMP
+        else:
+            return SupportedDataTypes.STRING
+
     def finalize_all_tables(self):
         for table_name in self.csv_writers:
             csv_writer = self.csv_writers[table_name]
             table_def = self.table_definitions[table_name]
-            self.tables_columns[table_name] = table_def.columns = csv_writer.fieldnames
+            self.tables_columns[table_name] = csv_writer.fieldnames
             self.write_manifest(table_def)
             csv_writer.close()
 
@@ -221,22 +325,22 @@ class Component(ComponentBase):
         json_message = error.response.json()["error"]
 
         if error.response.status_code == 401:
-            message = 'Request failed. Invalid credentials. Please verify your PAT token and the scopes allowed. ' \
-                      f'Detail: {json_message["type"]}, {json_message["message"]}'
+            message = (
+                "Request failed. Invalid credentials. Please verify your PAT token and the scopes allowed. "
+                f'Detail: {json_message["type"]}, {json_message["message"]}'
+            )
         else:
             message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
         raise UserException(message) from error
 
     def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
 
-        destination_name = self.configuration.parameters.get(KEY_GROUP_DESTINATION, {KEY_TABLE_NAME: ''}).get(
-            KEY_TABLE_NAME)
+        destination_name = self.configuration.parameters.get(KEY_GROUP_DESTINATION, {}).get(KEY_TABLE_NAME, "")
 
         if not destination_name:
             # see comments in list_fields() why it is necessary to use get_base_schema()
             tables = pyairtable.metadata.get_base_schema(api_table)
-            destination_name = next(
-                table['name'] for table in tables['tables'] if table['id'] == table_name)
+            destination_name = next(table["name"] for table in tables["tables"] if table["id"] == table_name)
         return destination_name
 
     def _get_parsed_date(self, date_input: Optional[str]) -> Optional[str]:
@@ -252,8 +356,7 @@ class Component(ComponentBase):
             try:
                 parsed_date = dateparser.parse(date_input).date()
             except (AttributeError, TypeError) as err:
-                raise UserException(
-                    f"Cannot parse date input {date_input}") from err
+                raise UserException(f"Cannot parse date input {date_input}") from err
         if parsed_date:
             parsed_date = parsed_date.strftime("%Y-%m-%d %H:%M:%S")
         return parsed_date
@@ -269,17 +372,17 @@ class Component(ComponentBase):
         filter = f"AND({after},{before})"
         return filter
 
-    def _get_table_in_base_schema(self, ):
+    def _get_table_in_base_schema(self):
         params: dict = self.configuration.parameters
         api_key: str = params.get(KEY_API_KEY)
         if not api_key:
-            raise UserException('API key or personal token is missing')
+            raise UserException("API key or personal token is missing")
         base_id: str = params.get(KEY_BASE_ID)
         if not base_id:
-            raise UserException('Base ID is missing')
+            raise UserException("Base ID is missing")
         table_name: str = params.get(KEY_TABLE_NAME)
         if not table_name:
-            raise UserException('ResultTable name is missing')
+            raise UserException("ResultTable name is missing")
         table = ApiTable(api_key, base_id, table_name)
         base_schema = pyairtable.metadata.get_base_schema(table)
         table_record = None
@@ -293,58 +396,54 @@ class Component(ComponentBase):
         table = self._get_table_in_base_schema()
         if not table:
             return []
-        attributes = [dict(value=field['id'], label=f"{field['name']} ({field['id']})") for field in
-                      table.get(key, [])]
+        attributes = [dict(value=field["id"], label=f"{field['name']} ({field['id']})") for field in table.get(key, [])]
         return attributes
 
-    @sync_action('list_fields')
+    @sync_action("list_fields")
     def list_fields(self):
-        fields = self._list_table_attributes('fields')
+        fields = self._list_table_attributes("fields")
         return fields
 
-    @sync_action('list_views')
+    @sync_action("list_views")
     def list_views(self):
-        views = self._list_table_attributes('views')
+        views = self._list_table_attributes("views")
         return views
 
-    @sync_action('list_bases')
+    @sync_action("list_bases")
     def list_bases(self):
         params: dict = self.configuration.parameters
         api_key: str = params.get(KEY_API_KEY)
         if not api_key:
-            raise UserException('API key or personal token missing')
+            raise UserException("API key or personal token missing")
         api = Api(api_key)
         bases = pyairtable.metadata.get_api_bases(api)
-        resp = [dict(
-            value=base['id'], label=f"{base['name']} ({base['id']})") for base in bases['bases']]
+        resp = [dict(value=base["id"], label=f"{base['name']} ({base['id']})") for base in bases["bases"]]
         return resp
 
-    @sync_action('testConnection')
+    @sync_action("testConnection")
     def test_connection(self):
         params: dict = self.configuration.parameters
         api_key: str = params.get(KEY_API_KEY)
         if not api_key:
-            raise UserException('API key or personal token missing')
+            raise UserException("API key or personal token missing")
         api = Api(api_key)
         try:
             pyairtable.metadata.get_api_bases(api)
         except Exception as e:
-            raise UserException(
-                "Login failed! Please check your API Token.") from e
+            raise UserException("Login failed! Please check your API Token.") from e
 
-    @sync_action('list_tables')
+    @sync_action("list_tables")
     def list_tables(self):
         params: dict = self.configuration.parameters
         api_key: str = params.get(KEY_API_KEY)
         if not api_key:
-            raise UserException('API key or personal token is missing')
+            raise UserException("API key or personal token is missing")
         base_id: str = params.get(KEY_BASE_ID)
         if not base_id:
-            raise UserException('Base ID is missing')
+            raise UserException("Base ID is missing")
         base = Base(api_key, base_id)
         tables = pyairtable.metadata.get_base_schema(base)
-        resp = [dict(
-            value=table['id'], label=f"{table['name']} ({table['id']})") for table in tables['tables']]
+        resp = [dict(value=table["id"], label=f"{table['name']} ({table['id']})") for table in tables["tables"]]
         return resp
 
 

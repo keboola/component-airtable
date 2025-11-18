@@ -1,0 +1,37 @@
+[project]
+name = "component-airtable"
+version = "0.1.0"
+description = "Extractor for Airtable tables"
+readme = "README.md"
+requires-python = "~=3.13.0"
+dependencies = [
+    "freezegun>=1.5.1",
+    "keboola-component>=1.6.10",
+    "keboola-csvwriter>=1.0.1",
+    "keboola-http-client>=1.0.0",
+    "keboola-utils>=1.1.0",
+    "mock>=5.0.2",
+    "pyairtable==1.4.0",
+    "typeguard>=3.0.2",
+]
+
+[tool.black]
+line-length = 120
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | venv
+  | env
+  | build
+  | dist
+  | data
+)/
+'''
+
+[dependency-groups]
+dev = [
+    "black>=25.9.0",
+    "flake8>=7.3.0",
+    "ruff>=0.13.3",
+]

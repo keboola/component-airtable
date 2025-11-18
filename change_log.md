@@ -1,3 +1,9 @@
+**0.1.2**
+
+-- updated to UV
+-- added support for native datatypes - Required Keboola Component update
+-- For simplicity pyairtable was left at 1.4.0. version
+
 **0.1.1**
 
 - fix requirements

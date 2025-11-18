@@ -26,10 +26,10 @@ def is_type(val, type: Type) -> bool:
 
 
 def flatten_dict(
-        dictionary: Dict,
-        parent_key: Optional[str] = None,
-        separator: str = SUBOBJECT_SEP,
-        flatten_lists: bool = False,
+    dictionary: Dict,
+    parent_key: Optional[str] = None,
+    separator: str = SUBOBJECT_SEP,
+    flatten_lists: bool = False,
 ):
     items = []
     for key, value in dictionary.items():
@@ -55,10 +55,7 @@ class ColumnType(Enum):
         for t in cls:
             if is_type(example_value, t.value):
                 return t
-        raise ValueError(
-            f'Unexpected field data type. Got value of "{example_value}"'
-            f' as type "{type(example_value)}".'
-        )
+        raise ValueError(f'Unexpected field data type. Got value of "{example_value}" as type "{type(example_value)}".')
 
 
 @dataclass(slots=True)
@@ -70,10 +67,10 @@ class ResultTable:
 
     @classmethod
     def from_dicts(
-            cls,
-            name: str,
-            dicts: List[Dict[str, Any]],
-            id_column_names: List[str] = [RECORD_ID_FIELD_NAME]
+        cls,
+        name: str,
+        dicts: List[Dict[str, Any]],
+        id_column_names: List[str] = [RECORD_ID_FIELD_NAME],
     ):
         if len(dicts) < 1:
             return None
@@ -95,9 +92,7 @@ class ResultTable:
                 for flattened_key, flattened_value in flattened_dict.items():
                     add_value_to_row(flattened_key, flattened_value, row_dict)
             elif column_type is ColumnType.ARRAY_OF_ELEMENTARY:
-                row_dict[column_name] = json.dumps(
-                    value
-                )  # TODO?: maybe create child table instead?
+                row_dict[column_name] = json.dumps(value)  # TODO?: maybe create child table instead?
             elif isinstance(value, list) and len(value) < 1:
                 row_dict[column_name] = ""
             elif isinstance(value, list) and isinstance(value[0], dict) and value[0].get("error", None):
@@ -109,7 +104,9 @@ class ResultTable:
                     self.__class__(
                         name=child_table_name,
                         id_column_names=[
-                            ARRAY_OBJECTS_ID_FIELD_NAME, PARENT_ID_COLUMN_NAME]
+                            ARRAY_OBJECTS_ID_FIELD_NAME,
+                            PARENT_ID_COLUMN_NAME,
+                        ],
                     ),
                 )
                 self.child_tables[child_table_name] = child_table
@@ -134,9 +131,7 @@ class ResultTable:
         self.rows.append(processed_dict)
 
     def rename_columns(self, rename_function: Callable[[str], str]):
-        self.rows = [
-            {rename_function(k): v for k, v in row.items()} for row in self.rows
-        ]
+        self.rows = [{rename_function(k): v for k, v in row.items()} for row in self.rows]
 
     def to_dicts(self) -> List[Dict[str, Any]]:
         return self.rows
