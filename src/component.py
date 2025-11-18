@@ -151,7 +151,7 @@ class Component(ComponentBase):
 
     def _create_keboola_schema(self, api_table: pyairtable.Table):
         """
-        Create Keboola schema from Airtable table metadata
+        Create Keboola schema from Airtable table metadata, filtered by selected fields.
         """
         try:
             table_id = api_table.table_name
@@ -178,8 +178,17 @@ class Component(ComponentBase):
                 primary_key=False,
             )
 
-            # Airtable fields
+            # Get selected fields from configuration (field IDs)
+            selected_field_ids = self.configuration.parameters.get(KEY_FIELDS, None)
+
+            # Airtable fields - filter by selected field IDs if provided
             for field in table_schema.get("fields", []):
+                field_id = field.get("id", "")
+
+                # If fields are specified, only include those fields
+                if selected_field_ids is not None and field_id not in selected_field_ids:
+                    continue
+
                 normalized_field_name = normalize_name(field.get("name", ""))
                 keboola_type = self._convert_airtable_type(field)
 
@@ -206,13 +215,20 @@ class Component(ComponentBase):
         return SupportedDataTypes.STRING
 
     def _augment_schema_with_table_data(self, table: ResultTable, schema: OrderedDict) -> OrderedDict:
-        """Extend schema with columns observed in the flattened table data."""
+        """Extend schema with columns observed in the flattened table data.
+
+        This method discovers columns that don't exist in the Airtable metadata,
+        typically resulting from flattening complex fields (e.g., Assignee -> Assignee_name, Assignee_email).
+        For safety, all discovered columns are typed as STRING to avoid type inference issues.
+        """
         for row in table.to_dicts():
-            for column_name, value in row.items():
-                if column_name in schema or value is None:
+            for column_name, _ in row.items():
+                if column_name in schema:
                     continue
-                inferred_type = self._infer_type_from_value(value)
-                schema[column_name] = ColumnDefinition(data_types=BaseType(dtype=inferred_type), primary_key=False)
+                # Default to STRING for all flattened/derived columns to avoid type inference issues
+                schema[column_name] = ColumnDefinition(
+                    data_types=BaseType(dtype=SupportedDataTypes.STRING), primary_key=False
+                )
         return schema
 
     def _store_table_columns(self, table_name: str, schema: OrderedDict):
