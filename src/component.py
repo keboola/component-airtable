@@ -129,19 +129,18 @@ class Component(ComponentBase):
             destination_table_name = self._get_result_table_name(api_table, table_id)
 
             logging.info(f"Downloading table: {destination_table_name}")
-            record_batch_processed = []
             for record_batch in api_table.iterate(**api_options):
-                record_batch_processed.extend([process_record(r) for r in record_batch])
-            result_table = ResultTable.from_dicts(
-                destination_table_name,
-                record_batch_processed,
-                id_column_names=[RECORD_ID_FIELD_NAME],
-            )
+                records = [process_record(r) for r in record_batch]
+                result_table = ResultTable.from_dicts(
+                    destination_table_name,
+                    records,
+                    id_column_names=[RECORD_ID_FIELD_NAME],
+                )
 
-            if result_table:
-                self.process_table(result_table, api_table)
-            else:
-                logging.warning("The result is empty!")
+                if result_table:
+                    self.process_table(result_table, api_table)
+                else:
+                    logging.warning("The result is empty!")
 
         except HTTPError as err:
             self._handle_http_error(err)
@@ -220,25 +219,34 @@ class Component(ComponentBase):
         schema = self._create_keboola_schema(api_table, table)
         self._store_table_columns(table.name, schema)
 
-        self.table_definitions[table.name] = table_def = self.table_definitions.get(
-            table.name,
-            self.create_out_table_definition(
+        # Get or create table definition
+        if table.name in self.table_definitions:
+            table_def = self.table_definitions[table.name]
+        else:
+            table_def = self.create_out_table_definition(
                 name=f"{table.name}.csv",
                 incremental=self.incremental_destination,
                 primary_key=table.id_column_names,
                 has_header=True,
                 schema=schema,  # Pass schema to enable native datatypes
-            ),
-        )
-        self.csv_writers[table.name] = csv_writer = self.csv_writers.get(
-            table.name,
-            ElasticDictWriter(
-                file_path=table_def.full_path,
-                fieldnames=self.tables_columns.get(table.name, []),
-            ),
-        )
+            )
+            self.table_definitions[table.name] = table_def
 
-        csv_writer.writeheader()
+        # Get or create CSV writer
+        if table.name in self.csv_writers:
+            csv_writer = self.csv_writers[table.name]
+        else:
+            if table.name in self.tables_columns:
+                fieldnames = self.tables_columns[table.name]
+            else:
+                fieldnames = []
+
+            csv_writer = ElasticDictWriter(
+                file_path=table_def.full_path,
+                fieldnames=fieldnames,
+            )
+            self.csv_writers[table.name] = csv_writer
+
         for row in table.to_dicts():
             try:
                 csv_writer.writerow(row)
@@ -290,6 +298,7 @@ class Component(ComponentBase):
             table_def = self.table_definitions[table_name]
             self.tables_columns[table_name] = csv_writer.fieldnames
             self.write_manifest(table_def)
+            csv_writer.writeheader()
             csv_writer.close()
 
     def _fetching_is_incremental(self) -> bool:
