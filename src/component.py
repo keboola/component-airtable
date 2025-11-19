@@ -129,6 +129,8 @@ class Component(ComponentBase):
             destination_table_name = self._get_result_table_name(api_table, table_id)
 
             logging.info(f"Downloading table: {destination_table_name}")
+
+            schema_initialized = False
             for record_batch in api_table.iterate(**api_options):
                 records = [process_record(r) for r in record_batch]
                 result_table = ResultTable.from_dicts(
@@ -138,7 +140,12 @@ class Component(ComponentBase):
                 )
 
                 if result_table:
-                    self.process_table(result_table, api_table)
+                    # Initialize schema and writers only once using the first batch
+                    if not schema_initialized:
+                        self.initialize_table(result_table, api_table)
+                        schema_initialized = True
+
+                    self.process_table(result_table)
                 else:
                     logging.warning("The result is empty!")
 
@@ -211,7 +218,8 @@ class Component(ComponentBase):
             return
         self.tables_columns[table_name] = list(schema.keys())
 
-    def process_table(self, table: ResultTable, api_table: pyairtable.Table = None):
+    def initialize_table(self, table: ResultTable, api_table: pyairtable.Table):
+        """Initialize table schema, definition, and CSV writer (called once per table)."""
         table.rename_columns(normalize_name)
         table.name = normalize_name(table.name)
 
@@ -219,33 +227,30 @@ class Component(ComponentBase):
         schema = self._create_keboola_schema(api_table, table)
         self._store_table_columns(table.name, schema)
 
-        # Get or create table definition
-        if table.name in self.table_definitions:
-            table_def = self.table_definitions[table.name]
-        else:
-            table_def = self.create_out_table_definition(
-                name=f"{table.name}.csv",
-                incremental=self.incremental_destination,
-                primary_key=table.id_column_names,
-                has_header=True,
-                schema=schema,  # Pass schema to enable native datatypes
-            )
-            self.table_definitions[table.name] = table_def
+        # Create table definition
+        table_def = self.create_out_table_definition(
+            name=f"{table.name}.csv",
+            incremental=self.incremental_destination,
+            primary_key=table.id_column_names,
+            has_header=True,
+            schema=schema,  # Pass schema to enable native datatypes
+        )
+        self.table_definitions[table.name] = table_def
 
-        # Get or create CSV writer
-        if table.name in self.csv_writers:
-            csv_writer = self.csv_writers[table.name]
-        else:
-            if table.name in self.tables_columns:
-                fieldnames = self.tables_columns[table.name]
-            else:
-                fieldnames = []
+        # Create CSV writer
+        fieldnames = self.tables_columns[table.name]
+        csv_writer = ElasticDictWriter(
+            file_path=table_def.full_path,
+            fieldnames=fieldnames,
+        )
+        self.csv_writers[table.name] = csv_writer
 
-            csv_writer = ElasticDictWriter(
-                file_path=table_def.full_path,
-                fieldnames=fieldnames,
-            )
-            self.csv_writers[table.name] = csv_writer
+    def process_table(self, table: ResultTable):
+        """Process a batch of table data (write rows to CSV)."""
+        table.rename_columns(normalize_name)
+        table.name = normalize_name(table.name)
+
+        csv_writer = self.csv_writers[table.name]
 
         for row in table.to_dicts():
             try:
