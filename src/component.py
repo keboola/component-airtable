@@ -1,6 +1,6 @@
 import logging
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime, timezone
 import dateparser
 
@@ -149,10 +149,26 @@ class Component(ComponentBase):
         self.finalize_all_tables()
         self.write_state_file(self.state)
 
-    def _create_keboola_schema(self, api_table: pyairtable.Table):
+    def _create_keboola_schema(self, api_table: pyairtable.Table, result_table: ResultTable):
         """
-        Create Keboola schema from Airtable table metadata, filtered by selected fields.
+        Create Keboola schema based on actual ResultTable columns,
+        using Airtable metadata for type information where available.
         """
+        schema = OrderedDict()
+
+        # Built-in fields
+        schema[normalize_name(RECORD_ID_FIELD_NAME)] = ColumnDefinition(
+            data_types=BaseType(dtype=SupportedDataTypes.STRING),
+            primary_key=True,
+            nullable=False,
+        )
+        schema[normalize_name(RECORD_CREATED_TIME_FIELD_NAME)] = ColumnDefinition(
+            data_types=BaseType(dtype=SupportedDataTypes.TIMESTAMP),
+            primary_key=False,
+        )
+
+        # Get Airtable metadata for type mapping
+        field_type_map = {}
         try:
             table_id = api_table.table_name
             tables = pyairtable.metadata.get_base_schema(api_table)
@@ -165,70 +181,29 @@ class Component(ComponentBase):
                     table_name=table_name,
                 )
             )
-            schema = OrderedDict()
 
-            # Built-in fields
-            schema[normalize_name(RECORD_ID_FIELD_NAME)] = ColumnDefinition(
-                data_types=BaseType(dtype=SupportedDataTypes.STRING),
-                primary_key=True,
-                nullable=False,
-            )
-            schema[normalize_name(RECORD_CREATED_TIME_FIELD_NAME)] = ColumnDefinition(
-                data_types=BaseType(dtype=SupportedDataTypes.TIMESTAMP),
-                primary_key=False,
-            )
-
-            # Get selected fields from configuration (field IDs)
-            selected_field_ids = self.configuration.parameters.get(KEY_FIELDS, None)
-
-            # Airtable fields - filter by selected field IDs if provided
+            # Build a map of normalized field names to their Airtable types
             for field in table_schema.get("fields", []):
-                field_id = field.get("id", "")
-
-                # If fields are specified, only include those fields
-                if selected_field_ids is not None and field_id not in selected_field_ids:
-                    continue
-
-                normalized_field_name = normalize_name(field.get("name", ""))
-                keboola_type = self._convert_airtable_type(field)
-
-                schema[normalized_field_name] = ColumnDefinition(
-                    data_types=BaseType(dtype=keboola_type), primary_key=False
-                )
-
-            logging.debug(f"Created schema for table '{table_name}' with {len(schema)} columns")
-            return schema
+                normalized_name = normalize_name(field.get("name", ""))
+                field_type_map[normalized_name] = self._convert_airtable_type(field)
         except Exception as e:
-            logging.warning(f"Failed to create schema for table '{table_name}': {e}")
-            return OrderedDict()
+            logging.warning(f"Failed to fetch Airtable metadata: {e}. All fields will default to STRING.")
 
-    def _infer_type_from_value(self, value: Any) -> SupportedDataTypes:
-        """Infer Keboola base type from a sample Python value."""
-        if isinstance(value, bool):
-            return SupportedDataTypes.BOOLEAN
-        if isinstance(value, int):
-            return SupportedDataTypes.INTEGER
-        if isinstance(value, float):
-            return SupportedDataTypes.FLOAT
-        if isinstance(value, datetime):
-            return SupportedDataTypes.TIMESTAMP
-        return SupportedDataTypes.STRING
+        # Get all actual columns from the ResultTable
+        actual_columns = set()
+        for row in result_table.to_dicts():
+            actual_columns.update(row.keys())
 
-    def _augment_schema_with_table_data(self, table: ResultTable, schema: OrderedDict) -> OrderedDict:
-        """Extend schema with columns observed in the flattened table data.
+        # Add schema for all actual columns (except built-ins already added)
+        for column_name in actual_columns:
+            if column_name in schema:
+                continue
 
-        This method discovers columns that don't exist in the Airtable metadata,
-        typically resulting from flattening complex fields (e.g., Assignee -> Assignee_name, Assignee_email).
-        For safety, all discovered columns are typed as STRING to avoid type inference issues.
-        """
-        for row in table.to_dicts():
-            for column_name, _ in row.items():
-                if column_name in schema:
-                    continue
-                # Default to STRING for all flattened/derived columns to avoid type inference issues
-                schema[column_name] = ColumnDefinition(
-                    data_types=BaseType(dtype=SupportedDataTypes.STRING), primary_key=False
-                )
+            # Try to get type from Airtable metadata, otherwise default to STRING
+            keboola_type = field_type_map.get(column_name, SupportedDataTypes.STRING)
+            schema[column_name] = ColumnDefinition(data_types=BaseType(dtype=keboola_type), primary_key=False)
+
+        logging.debug(f"Created schema with {len(schema)} columns from ResultTable")
         return schema
 
     def _store_table_columns(self, table_name: str, schema: OrderedDict):
@@ -241,9 +216,8 @@ class Component(ComponentBase):
         table.rename_columns(normalize_name)
         table.name = normalize_name(table.name)
 
-        # Create schema using Airtable metadata
-        schema = self._create_keboola_schema(api_table)
-        schema = self._augment_schema_with_table_data(table, schema)
+        # Create schema based on actual ResultTable columns, using Airtable metadata for types
+        schema = self._create_keboola_schema(api_table, table)
         self._store_table_columns(table.name, schema)
 
         self.table_definitions[table.name] = table_def = self.table_definitions.get(
