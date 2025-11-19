@@ -1,6 +1,6 @@
 import logging
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime, timezone
 import dateparser
 
@@ -129,19 +129,25 @@ class Component(ComponentBase):
             destination_table_name = self._get_result_table_name(api_table, table_id)
 
             logging.info(f"Downloading table: {destination_table_name}")
-            record_batch_processed = []
-            for record_batch in api_table.iterate(**api_options):
-                record_batch_processed.extend([process_record(r) for r in record_batch])
-            result_table = ResultTable.from_dicts(
-                destination_table_name,
-                record_batch_processed,
-                id_column_names=[RECORD_ID_FIELD_NAME],
-            )
 
-            if result_table:
-                self.process_table(result_table, api_table)
-            else:
-                logging.warning("The result is empty!")
+            schema_initialized = False
+            for record_batch in api_table.iterate(**api_options):
+                records = [process_record(r) for r in record_batch]
+                result_table = ResultTable.from_dicts(
+                    destination_table_name,
+                    records,
+                    id_column_names=[RECORD_ID_FIELD_NAME],
+                )
+
+                if result_table:
+                    # Initialize schema and writers only once using the first batch
+                    if not schema_initialized:
+                        self.initialize_table(result_table, api_table)
+                        schema_initialized = True
+
+                    self.process_table(result_table)
+                else:
+                    logging.warning("The result is empty!")
 
         except HTTPError as err:
             self._handle_http_error(err)
@@ -149,10 +155,26 @@ class Component(ComponentBase):
         self.finalize_all_tables()
         self.write_state_file(self.state)
 
-    def _create_keboola_schema(self, api_table: pyairtable.Table):
+    def _create_keboola_schema(self, api_table: pyairtable.Table, result_table: ResultTable):
         """
-        Create Keboola schema from Airtable table metadata
+        Create Keboola schema based on actual ResultTable columns,
+        using Airtable metadata for type information where available.
         """
+        schema = OrderedDict()
+
+        # Built-in fields
+        schema[normalize_name(RECORD_ID_FIELD_NAME)] = ColumnDefinition(
+            data_types=BaseType(dtype=SupportedDataTypes.STRING),
+            primary_key=True,
+            nullable=False,
+        )
+        schema[normalize_name(RECORD_CREATED_TIME_FIELD_NAME)] = ColumnDefinition(
+            data_types=BaseType(dtype=SupportedDataTypes.TIMESTAMP),
+            primary_key=False,
+        )
+
+        # Get Airtable metadata for type mapping
+        field_type_map = {}
         try:
             table_id = api_table.table_name
             tables = pyairtable.metadata.get_base_schema(api_table)
@@ -165,54 +187,29 @@ class Component(ComponentBase):
                     table_name=table_name,
                 )
             )
-            schema = OrderedDict()
 
-            # Built-in fields
-            schema[normalize_name(RECORD_ID_FIELD_NAME)] = ColumnDefinition(
-                data_types=BaseType(dtype=SupportedDataTypes.STRING),
-                primary_key=True,
-                nullable=False,
-            )
-            schema[normalize_name(RECORD_CREATED_TIME_FIELD_NAME)] = ColumnDefinition(
-                data_types=BaseType(dtype=SupportedDataTypes.TIMESTAMP),
-                primary_key=False,
-            )
-
-            # Airtable fields
+            # Build a map of normalized field names to their Airtable types
             for field in table_schema.get("fields", []):
-                normalized_field_name = normalize_name(field.get("name", ""))
-                keboola_type = self._convert_airtable_type(field)
-
-                schema[normalized_field_name] = ColumnDefinition(
-                    data_types=BaseType(dtype=keboola_type), primary_key=False
-                )
-
-            logging.debug(f"Created schema for table '{table_name}' with {len(schema)} columns")
-            return schema
+                normalized_name = normalize_name(field.get("name", ""))
+                field_type_map[normalized_name] = self._convert_airtable_type(field)
         except Exception as e:
-            logging.warning(f"Failed to create schema for table '{table_name}': {e}")
-            return OrderedDict()
+            logging.warning(f"Failed to fetch Airtable metadata: {e}. All fields will default to STRING.")
 
-    def _infer_type_from_value(self, value: Any) -> SupportedDataTypes:
-        """Infer Keboola base type from a sample Python value."""
-        if isinstance(value, bool):
-            return SupportedDataTypes.BOOLEAN
-        if isinstance(value, int):
-            return SupportedDataTypes.INTEGER
-        if isinstance(value, float):
-            return SupportedDataTypes.FLOAT
-        if isinstance(value, datetime):
-            return SupportedDataTypes.TIMESTAMP
-        return SupportedDataTypes.STRING
+        # Get all actual columns from the ResultTable
+        actual_columns = set()
+        for row in result_table.to_dicts():
+            actual_columns.update(row.keys())
 
-    def _augment_schema_with_table_data(self, table: ResultTable, schema: OrderedDict) -> OrderedDict:
-        """Extend schema with columns observed in the flattened table data."""
-        for row in table.to_dicts():
-            for column_name, value in row.items():
-                if column_name in schema or value is None:
-                    continue
-                inferred_type = self._infer_type_from_value(value)
-                schema[column_name] = ColumnDefinition(data_types=BaseType(dtype=inferred_type), primary_key=False)
+        # Add schema for all actual columns (except built-ins already added)
+        for column_name in actual_columns:
+            if column_name in schema:
+                continue
+
+            # Try to get type from Airtable metadata, otherwise default to STRING
+            keboola_type = field_type_map.get(column_name, SupportedDataTypes.STRING)
+            schema[column_name] = ColumnDefinition(data_types=BaseType(dtype=keboola_type), primary_key=False)
+
+        logging.debug(f"Created schema with {len(schema)} columns from ResultTable")
         return schema
 
     def _store_table_columns(self, table_name: str, schema: OrderedDict):
@@ -221,34 +218,40 @@ class Component(ComponentBase):
             return
         self.tables_columns[table_name] = list(schema.keys())
 
-    def process_table(self, table: ResultTable, api_table: pyairtable.Table = None):
+    def initialize_table(self, table: ResultTable, api_table: pyairtable.Table):
+        """Initialize table schema, definition, and CSV writer (called once per table)."""
         table.rename_columns(normalize_name)
         table.name = normalize_name(table.name)
 
-        # Create schema using Airtable metadata
-        schema = self._create_keboola_schema(api_table)
-        schema = self._augment_schema_with_table_data(table, schema)
+        # Create schema based on actual ResultTable columns, using Airtable metadata for types
+        schema = self._create_keboola_schema(api_table, table)
         self._store_table_columns(table.name, schema)
 
-        self.table_definitions[table.name] = table_def = self.table_definitions.get(
-            table.name,
-            self.create_out_table_definition(
-                name=f"{table.name}.csv",
-                incremental=self.incremental_destination,
-                primary_key=table.id_column_names,
-                has_header=True,
-                schema=schema,  # Pass schema to enable native datatypes
-            ),
+        # Create table definition
+        table_def = self.create_out_table_definition(
+            name=f"{table.name}.csv",
+            incremental=self.incremental_destination,
+            primary_key=table.id_column_names,
+            has_header=True,
+            schema=schema,  # Pass schema to enable native datatypes
         )
-        self.csv_writers[table.name] = csv_writer = self.csv_writers.get(
-            table.name,
-            ElasticDictWriter(
-                file_path=table_def.full_path,
-                fieldnames=self.tables_columns.get(table.name, []),
-            ),
-        )
+        self.table_definitions[table.name] = table_def
 
-        csv_writer.writeheader()
+        # Create CSV writer
+        fieldnames = self.tables_columns[table.name]
+        csv_writer = ElasticDictWriter(
+            file_path=table_def.full_path,
+            fieldnames=fieldnames,
+        )
+        self.csv_writers[table.name] = csv_writer
+
+    def process_table(self, table: ResultTable):
+        """Process a batch of table data (write rows to CSV)."""
+        table.rename_columns(normalize_name)
+        table.name = normalize_name(table.name)
+
+        csv_writer = self.csv_writers[table.name]
+
         for row in table.to_dicts():
             try:
                 csv_writer.writerow(row)
@@ -300,6 +303,7 @@ class Component(ComponentBase):
             table_def = self.table_definitions[table_name]
             self.tables_columns[table_name] = csv_writer.fieldnames
             self.write_manifest(table_def)
+            csv_writer.writeheader()
             csv_writer.close()
 
     def _fetching_is_incremental(self) -> bool:

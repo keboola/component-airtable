@@ -72,7 +72,7 @@
       "propertyOrder": 30,
       "title": "Fields",
       "type": "array",
-      "description": "The fields you want to download. You may leave this empty to download all fields. Note: in case od use_view even hidden fields will be retrieved.",
+      "description": "The fields you want to download. You may leave this empty to download all fields. Note: in case of use_view even hidden fields will be retrieved.",
       "format": "select",
       "uniqueItems": true,
       "items": {
