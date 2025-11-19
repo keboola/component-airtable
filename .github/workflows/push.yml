@@ -27,7 +27,7 @@ jobs:
     name: Push Event Info
     runs-on: ubuntu-latest
     outputs:
-      app_image_tag: '${{ steps.tag.outputs.app_image_tag }}-${{ github.run_id }}'
+      app_image_tag: ${{ steps.tag.outputs.app_image_tag }}
       is_semantic_tag: ${{ steps.tag.outputs.is_semantic_tag }}
       is_default_branch: ${{ steps.default_branch.outputs.is_default_branch }}
       is_deploy_ready: ${{ steps.deploy_ready.outputs.is_deploy_ready }}
