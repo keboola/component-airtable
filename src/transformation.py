@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
-from typing import Any, Callable, Union, Type, MutableMapping
+from typing import Any, Callable, MutableMapping, Type, Union
 
 import typeguard
 from typeguard import TypeCheckError

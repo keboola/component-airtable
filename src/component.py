@@ -1,26 +1,27 @@
 import logging
 from collections import OrderedDict
-from typing import Any
 from datetime import datetime, timezone
-import dateparser
+from typing import Any
 
+import dateparser
 import pyairtable
 import pyairtable.metadata
 from keboola.component import ComponentBase
 from keboola.component.base import sync_action
 from keboola.component.dao import (
-    TableDefinition,
-    SupportedDataTypes,
-    ColumnDefinition,
     BaseType,
+    ColumnDefinition,
+    SupportedDataTypes,
+    TableDefinition,
 )
 from keboola.component.exceptions import UserException
+from keboola.csvwriter import ElasticDictWriter
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
-from pyairtable import Api, Base, retry_strategy, Table as ApiTable
+from pyairtable import Api, Base, retry_strategy
+from pyairtable import Table as ApiTable
 from requests import HTTPError
 
-from keboola.csvwriter import ElasticDictWriter
-from transformation import ResultTable, RECORD_ID_FIELD_NAME
+from transformation import RECORD_ID_FIELD_NAME, ResultTable
 
 # Configuration variables
 KEY_API_KEY = "#api_key"
@@ -79,6 +80,8 @@ class Component(ComponentBase):
     If `debug` parameter is present in the `config.json`, the default logger is set to verbose DEBUG mode.
     """
 
+    RETRY_STRATEGY = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
+
     def __init__(self):
         super().__init__()
 
@@ -124,9 +127,8 @@ class Component(ComponentBase):
         table_id: str = params[KEY_TABLE_NAME]
         view_id: str | None = params.get(KEY_VIEW_NAME)
         fields: list[str] | None = params.get(KEY_FIELDS, None)
-        self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}).get(
-            KEY_INCREMENTAL_LOAD
-        )
+        destination = params.get(KEY_GROUP_DESTINATION, {})
+        self.incremental_destination: bool = destination.get(KEY_INCREMENTAL_LOAD, True)
         return api_key, base_id, table_id, view_id, fields
 
     def _setup_api_options(self, fields: list[str] | None, view_id: str | None) -> dict:
@@ -142,8 +144,7 @@ class Component(ComponentBase):
 
     def _process_table_data(self, api_key: str, base_id: str, table_id: str, api_options: dict):
         """Process table data from Airtable API."""
-        retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
-        api_table = pyairtable.Table(api_key, base_id, table_id, retry_strategy=retry)
+        api_table = pyairtable.Table(api_key, base_id, table_id, retry_strategy=self.RETRY_STRATEGY)
         destination_table_name = self._get_result_table_name(api_table, table_id)
 
         logging.info(f"Downloading table: {destination_table_name}")
