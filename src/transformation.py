@@ -1,8 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-from types import NoneType
-from typing import Any, Callable, MutableMapping, Type, Union
+from typing import Any, Callable, MutableMapping, Type
 
 import typeguard
 from typeguard import TypeCheckError
@@ -13,7 +12,7 @@ RECORD_ID_FIELD_NAME = "record_id"
 ARRAY_OBJECTS_ID_FIELD_NAME = "id"
 PARENT_ID_COLUMN_NAME = "parent_id"
 
-ELEMENTARY_TYPE = Union[int, float, str, bool, NoneType]
+ELEMENTARY_TYPE = int | float | str | bool | None
 
 
 def is_type(val, type: Type) -> bool:
@@ -51,7 +50,7 @@ class ColumnType(Enum):
     ARRAY_OF_OBJECTS = list[dict]
 
     @classmethod
-    def from_example_value(cls, example_value):
+    def from_example_value(cls, example_value) -> "ColumnType":
         for t in cls:
             if is_type(example_value, t.value):
                 return t

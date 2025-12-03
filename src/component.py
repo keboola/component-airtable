@@ -55,7 +55,7 @@ SUB = "_"
 HEADER_NORMALIZER = DefaultHeaderNormalizer(forbidden_sub=SUB)
 
 
-def normalize_name(name: str):
+def normalize_name(name: str) -> str:
     return HEADER_NORMALIZER.normalize_header([name])[0]
 
 
@@ -142,7 +142,7 @@ class Component(ComponentBase):
             api_options["view"] = view_id
         return api_options
 
-    def _process_table_data(self, api_key: str, base_id: str, table_id: str, api_options: dict):
+    def _process_table_data(self, api_key: str, base_id: str, table_id: str, api_options: dict[str, Any]):
         """Process table data from Airtable API."""
         api_table = pyairtable.Table(api_key, base_id, table_id, retry_strategy=self.RETRY_STRATEGY)
         destination_table_name = self._get_result_table_name(api_table, table_id)
