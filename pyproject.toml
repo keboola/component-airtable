@@ -10,7 +10,6 @@ dependencies = [
     "keboola-csvwriter>=1.0.1",
     "keboola-http-client>=1.0.0",
     "keboola-utils>=1.1.0",
-    "mock>=5.0.2",
     "pyairtable==1.4.0",
     "typeguard>=3.0.2",
 ]
@@ -33,5 +32,6 @@ exclude = '''
 dev = [
     "black>=25.9.0",
     "flake8>=7.3.0",
+    "mock>=5.0.2",
     "ruff>=0.13.3",
 ]

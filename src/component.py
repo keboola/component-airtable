@@ -1,26 +1,28 @@
 import logging
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from dataclasses import dataclass
 from datetime import datetime, timezone
-import dateparser
+from typing import Any
 
+import dateparser
 import pyairtable
 import pyairtable.metadata
 from keboola.component import ComponentBase
 from keboola.component.base import sync_action
 from keboola.component.dao import (
-    TableDefinition,
-    SupportedDataTypes,
-    ColumnDefinition,
     BaseType,
+    ColumnDefinition,
+    SupportedDataTypes,
+    TableDefinition,
 )
 from keboola.component.exceptions import UserException
+from keboola.csvwriter import ElasticDictWriter
 from keboola.utils.header_normalizer import DefaultHeaderNormalizer
-from pyairtable import Api, Base, retry_strategy, Table as ApiTable
+from pyairtable import Api, Base, retry_strategy
+from pyairtable import Table as ApiTable
 from requests import HTTPError
 
-from keboola.csvwriter import ElasticDictWriter
-from transformation import ResultTable, RECORD_ID_FIELD_NAME
+from transformation import RECORD_ID_FIELD_NAME, ResultTable
 
 # Configuration variables
 KEY_API_KEY = "#api_key"
@@ -54,11 +56,51 @@ SUB = "_"
 HEADER_NORMALIZER = DefaultHeaderNormalizer(forbidden_sub=SUB)
 
 
+@dataclass
+class AirtableConfig:
+    """Configuration for Airtable component."""
+
+    api_key: str
+    base_id: str
+    table_name: str
+    view_name: str | None = None
+    fields: list[str] | None = None
+    incremental_destination: bool = True
+    sync_mode: str | None = None
+    date_from: str | None = None
+    date_to: str | None = None
+    destination_table_name: str = ""
+
+    @classmethod
+    def from_parameters(cls, params: dict[str, Any]) -> "AirtableConfig":
+        """Create config from component parameters."""
+        sync_options = params.get(KEY_SYNC_OPTIONS, {})
+        destination = params.get(KEY_GROUP_DESTINATION, {})
+
+        return cls(
+            api_key=params[KEY_API_KEY],
+            base_id=params[KEY_BASE_ID],
+            table_name=params[KEY_TABLE_NAME],
+            view_name=params.get(KEY_VIEW_NAME),
+            fields=params.get(KEY_FIELDS),
+            incremental_destination=destination.get(KEY_INCREMENTAL_LOAD, True),
+            sync_mode=sync_options.get(KEY_SYNC_MODE),
+            date_from=sync_options.get(KEY_SYNC_DATE_FROM),
+            date_to=sync_options.get(KEY_SYNC_DATE_TO),
+            destination_table_name=destination.get(KEY_TABLE_NAME, ""),
+        )
+
+
 def normalize_name(name: str):
     return HEADER_NORMALIZER.normalize_header([name])[0]
 
 
-def process_record(record: Dict) -> Dict:
+def process_record(record: dict) -> dict:
+    """
+    Process Airtable record into output format.
+
+    Airtable API guarantees these fields are always present in records.
+    """
     fields = record["fields"]
     output_record = {
         RECORD_ID_FIELD_NAME: record["id"],
@@ -82,12 +124,21 @@ class Component(ComponentBase):
     def __init__(self):
         super().__init__()
 
-        self.table_definitions: Dict[str, TableDefinition] = {}
-        self.csv_writers: Dict[str, ElasticDictWriter] = {}
-        self.tables_columns = dict()
-        self.incremental_destination: bool = False
-        self.last_run = int()
-        self.state = dict()
+        # These will be initialized in run() after validation
+        self.config: AirtableConfig | None = None
+        self.api_table: ApiTable | None = None
+        self.retry_strategy = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
+
+        # Table processing state
+        self.table_definitions: dict[str, TableDefinition] = {}
+        self.csv_writers: dict[str, ElasticDictWriter] = {}
+        self.tables_columns: dict[str, list[str]] = {}
+
+        # Sync state
+        self.last_run: str | None = None
+        self.state: dict[str, Any] = {}
+        self.date_from: str | None = None
+        self.date_to: str | None = None
 
     def run(self):
         """
@@ -96,42 +147,41 @@ class Component(ComponentBase):
         # Check for missing configuration parameters
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
+
+        # Initialize configuration
+        params = self.configuration.parameters
+        self.config = AirtableConfig.from_parameters(params)
+
+        # Initialize state
         self.state = self.get_state_file()
-        self.last_run = self.state.get(KEY_STATE_LAST_RUN, {}) or []
+        self.last_run = self.state.get(KEY_STATE_LAST_RUN)
         self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         self.date_from = self._get_date_from()
         self.date_to = self._get_date_to()
-        self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(KEY_TABLES_COLUMNS, {})
+        self.tables_columns = self.state.get(KEY_TABLES_COLUMNS, {})
+        self.state[KEY_TABLES_COLUMNS] = self.tables_columns
 
-        params: dict = self.configuration.parameters
-        # Access parameters in data/config.json
-        api_key: str = params[KEY_API_KEY]
-        base_id: str = params[KEY_BASE_ID]
-        table_id: str = params[KEY_TABLE_NAME]
-        view_id: Optional[str] = params.get(KEY_VIEW_NAME)
-        fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
-        self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}).get(
-            KEY_INCREMENTAL_LOAD
+        # Initialize API client
+        self.api_table = pyairtable.Table(
+            self.config.api_key, self.config.base_id, self.config.table_name, retry_strategy=self.retry_strategy
         )
 
+        # Build API options
         api_options = {}
         if self._fetching_is_incremental():
             api_options["formula"] = self._create_filter()
-        if fields:
-            api_options["fields"] = fields
-        if view_id:
-            api_options["view"] = view_id
-
-        retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
+        if self.config.fields:
+            api_options["fields"] = self.config.fields
+        if self.config.view_name:
+            api_options["view"] = self.config.view_name
 
         try:
-            api_table = pyairtable.Table(api_key, base_id, table_id, retry_strategy=retry)
-            destination_table_name = self._get_result_table_name(api_table, table_id)
+            destination_table_name = self._get_result_table_name(self.api_table, self.config.table_name)
 
             logging.info(f"Downloading table: {destination_table_name}")
 
             schema_initialized = False
-            for record_batch in api_table.iterate(**api_options):
+            for record_batch in self.api_table.iterate(**api_options):
                 records = [process_record(r) for r in record_batch]
                 result_table = ResultTable.from_dicts(
                     destination_table_name,
@@ -142,7 +192,7 @@ class Component(ComponentBase):
                 if result_table:
                     # Initialize schema and writers only once using the first batch
                     if not schema_initialized:
-                        self.initialize_table(result_table, api_table)
+                        self.initialize_table(result_table, self.api_table)
                         schema_initialized = True
 
                     self.process_table(result_table)
@@ -182,8 +232,8 @@ class Component(ComponentBase):
 
             table_schema = pyairtable.metadata.get_table_schema(
                 pyairtable.Table(
-                    api_key=self.configuration.parameters[KEY_API_KEY],
-                    base_id=self.configuration.parameters[KEY_BASE_ID],
+                    api_key=self.config.api_key,
+                    base_id=self.config.base_id,
                     table_name=table_name,
                 )
             )
@@ -230,7 +280,7 @@ class Component(ComponentBase):
         # Create table definition
         table_def = self.create_out_table_definition(
             name=f"{table.name}.csv",
-            incremental=self.incremental_destination,
+            incremental=self.config.incremental_destination,
             primary_key=table.id_column_names,
             has_header=True,
             schema=schema,  # Pass schema to enable native datatypes
@@ -307,22 +357,15 @@ class Component(ComponentBase):
             csv_writer.close()
 
     def _fetching_is_incremental(self) -> bool:
-        params = self.configuration.parameters
-        loading_options = params.get(KEY_SYNC_OPTIONS, {})
-        load_type = loading_options.get(KEY_SYNC_MODE)
-        return load_type == "incremental_sync"
+        return self.config.sync_mode == "incremental_sync"
 
-    def _get_date_from(self) -> Optional[str]:
-        params = self.configuration.parameters
-        loading_options = params.get(KEY_SYNC_OPTIONS, {})
+    def _get_date_from(self) -> str | None:
         incremental = self._fetching_is_incremental()
-        return self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_FROM)) if incremental else None
+        return self._get_parsed_date(self.config.date_from) if incremental else None
 
-    def _get_date_to(self) -> Optional[str]:
-        params = self.configuration.parameters
-        loading_options = params.get(KEY_SYNC_OPTIONS, {})
+    def _get_date_to(self) -> str | None:
         incremental = self._fetching_is_incremental()
-        return self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_TO)) if incremental else None
+        return self._get_parsed_date(self.config.date_to) if incremental else None
 
     @staticmethod
     def _handle_http_error(error: HTTPError):
@@ -338,8 +381,7 @@ class Component(ComponentBase):
         raise UserException(message) from error
 
     def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
-
-        destination_name = self.configuration.parameters.get(KEY_GROUP_DESTINATION, {}).get(KEY_TABLE_NAME, "")
+        destination_name = self.config.destination_table_name
 
         if not destination_name:
             # see comments in list_fields() why it is necessary to use get_base_schema()
@@ -347,7 +389,7 @@ class Component(ComponentBase):
             destination_name = next(table["name"] for table in tables["tables"] if table["id"] == table_name)
         return destination_name
 
-    def _get_parsed_date(self, date_input: Optional[str]) -> Optional[str]:
+    def _get_parsed_date(self, date_input: str | None) -> str | None:
         if not date_input:
             parsed_date = None
         elif date_input.lower() in ["last", "last run"] and self.last_run:
@@ -377,16 +419,22 @@ class Component(ComponentBase):
         return filter
 
     def _get_table_in_base_schema(self):
-        params: dict = self.configuration.parameters
-        api_key: str = params.get(KEY_API_KEY)
+        """
+        Get table schema for sync actions.
+
+        Note: This is used by sync actions which run before config initialization,
+        so it accesses configuration.parameters directly.
+        """
+        params = self.configuration.parameters
+        api_key = params.get(KEY_API_KEY)
         if not api_key:
             raise UserException("API key or personal token is missing")
-        base_id: str = params.get(KEY_BASE_ID)
+        base_id = params.get(KEY_BASE_ID)
         if not base_id:
             raise UserException("Base ID is missing")
-        table_name: str = params.get(KEY_TABLE_NAME)
+        table_name = params.get(KEY_TABLE_NAME)
         if not table_name:
-            raise UserException("ResultTable name is missing")
+            raise UserException("Table name is missing")
         table = ApiTable(api_key, base_id, table_name)
         base_schema = pyairtable.metadata.get_base_schema(table)
         table_record = None
@@ -400,8 +448,7 @@ class Component(ComponentBase):
         table = self._get_table_in_base_schema()
         if not table:
             return []
-        attributes = [dict(value=field["id"], label=f"{field['name']} ({field['id']})") for field in table.get(key, [])]
-        return attributes
+        return [{"value": field["id"], "label": f"{field['name']} ({field['id']})"} for field in table.get(key, [])]
 
     @sync_action("list_fields")
     def list_fields(self):
@@ -415,19 +462,20 @@ class Component(ComponentBase):
 
     @sync_action("list_bases")
     def list_bases(self):
-        params: dict = self.configuration.parameters
-        api_key: str = params.get(KEY_API_KEY)
+        """Sync action to list available Airtable bases."""
+        params = self.configuration.parameters
+        api_key = params.get(KEY_API_KEY)
         if not api_key:
             raise UserException("API key or personal token missing")
         api = Api(api_key)
         bases = pyairtable.metadata.get_api_bases(api)
-        resp = [dict(value=base["id"], label=f"{base['name']} ({base['id']})") for base in bases["bases"]]
-        return resp
+        return [{"value": base["id"], "label": f"{base['name']} ({base['id']})"} for base in bases["bases"]]
 
     @sync_action("testConnection")
     def test_connection(self):
-        params: dict = self.configuration.parameters
-        api_key: str = params.get(KEY_API_KEY)
+        """Sync action to test connection with provided API key."""
+        params = self.configuration.parameters
+        api_key = params.get(KEY_API_KEY)
         if not api_key:
             raise UserException("API key or personal token missing")
         api = Api(api_key)
@@ -438,17 +486,17 @@ class Component(ComponentBase):
 
     @sync_action("list_tables")
     def list_tables(self):
-        params: dict = self.configuration.parameters
-        api_key: str = params.get(KEY_API_KEY)
+        """Sync action to list tables in a base."""
+        params = self.configuration.parameters
+        api_key = params.get(KEY_API_KEY)
         if not api_key:
             raise UserException("API key or personal token is missing")
-        base_id: str = params.get(KEY_BASE_ID)
+        base_id = params.get(KEY_BASE_ID)
         if not base_id:
             raise UserException("Base ID is missing")
         base = Base(api_key, base_id)
         tables = pyairtable.metadata.get_base_schema(base)
-        resp = [dict(value=table["id"], label=f"{table['name']} ({table['id']})") for table in tables["tables"]]
-        return resp
+        return [{"value": table["id"], "label": f"{table['name']} ({table['id']})"} for table in tables["tables"]]
 
 
 """

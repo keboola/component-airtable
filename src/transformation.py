@@ -1,8 +1,15 @@
+"""
+Transformation utilities for converting nested Airtable data into flat CSV tables.
+
+Handles flattening of nested objects, array processing, and child table generation
+for complex Airtable field types.
+"""
+
 import json
+from collections.abc import Callable, MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
-from types import NoneType
-from typing import Any, Callable, Dict, Optional, Union, Type, List, MutableMapping
+from typing import Any
 
 import typeguard
 from typeguard import TypeCheckError
@@ -13,12 +20,12 @@ RECORD_ID_FIELD_NAME = "record_id"
 ARRAY_OBJECTS_ID_FIELD_NAME = "id"
 PARENT_ID_COLUMN_NAME = "parent_id"
 
-ELEMENTARY_TYPE = Union[int, float, str, bool, NoneType]
+ELEMENTARY_TYPE = int | float | str | bool | None
 
 
-def is_type(val, type: Type) -> bool:
+def is_type(val, expected_type: type[Any]) -> bool:
     try:
-        typeguard.check_type(val, type)
+        typeguard.check_type(val, expected_type)
     except TypeCheckError:
         return False
     else:
@@ -26,8 +33,8 @@ def is_type(val, type: Type) -> bool:
 
 
 def flatten_dict(
-    dictionary: Dict,
-    parent_key: Optional[str] = None,
+    dictionary: dict,
+    parent_key: str | None = None,
     separator: str = SUBOBJECT_SEP,
     flatten_lists: bool = False,
 ):
@@ -35,7 +42,7 @@ def flatten_dict(
     for key, value in dictionary.items():
         new_key = str(parent_key) + separator + key if parent_key else key
         if isinstance(value, MutableMapping):
-            items.extend(flatten_dict(dict(value), new_key, separator).items())
+            items.extend(flatten_dict(value, new_key, separator).items())
         elif flatten_lists and isinstance(value, list):
             for k, v in enumerate(value):
                 items.extend(flatten_dict({str(k): v}, new_key).items())
@@ -46,9 +53,9 @@ def flatten_dict(
 
 class ColumnType(Enum):
     ELEMENTARY = ELEMENTARY_TYPE
-    OBJECT = Dict
-    ARRAY_OF_ELEMENTARY = List[ELEMENTARY_TYPE]
-    ARRAY_OF_OBJECTS = List[Dict]
+    OBJECT = dict
+    ARRAY_OF_ELEMENTARY = list[ELEMENTARY_TYPE]
+    ARRAY_OF_OBJECTS = list[dict]
 
     @classmethod
     def from_example_value(cls, example_value):
@@ -61,16 +68,16 @@ class ColumnType(Enum):
 @dataclass(slots=True)
 class ResultTable:
     name: str
-    id_column_names: List[str]
-    rows: List[Dict[str, Any]] = field(default_factory=list)
-    child_tables: Dict[str, "ResultTable"] = field(default_factory=dict)
+    id_column_names: list[str]
+    rows: list[dict[str, Any]] = field(default_factory=list)
+    child_tables: dict[str, "ResultTable"] = field(default_factory=dict)
 
     @classmethod
     def from_dicts(
         cls,
         name: str,
-        dicts: List[Dict[str, Any]],
-        id_column_names: List[str] = [RECORD_ID_FIELD_NAME],
+        dicts: list[dict[str, Any]],
+        id_column_names: list[str] = [RECORD_ID_FIELD_NAME],
     ):
         if len(dicts) < 1:
             return None
@@ -79,9 +86,9 @@ class ResultTable:
             table.add_row(row_dict)
         return table
 
-    def add_row(self, row_dict: Dict[str, Any]):
+    def add_row(self, row_dict: dict[str, Any]):
 
-        def add_value_to_row(column_name: str, value, row_dict: Dict[str, Any]):
+        def add_value_to_row(column_name: str, value, row_dict: dict[str, Any]):
             if value is None:
                 return
             column_type = ColumnType.from_example_value(value)
@@ -112,7 +119,7 @@ class ResultTable:
                 self.child_tables[child_table_name] = child_table
                 # Add parent id to child table
                 for child_dict in value:
-                    child_dict: Dict
+                    child_dict: dict
                     if RECORD_ID_FIELD_NAME in row_dict:
                         child_dict[PARENT_ID_COLUMN_NAME] = row_dict[RECORD_ID_FIELD_NAME]
                     child_table.add_row(child_dict)
@@ -133,5 +140,5 @@ class ResultTable:
     def rename_columns(self, rename_function: Callable[[str], str]):
         self.rows = [{rename_function(k): v for k, v in row.items()} for row in self.rows]
 
-    def to_dicts(self) -> List[Dict[str, Any]]:
+    def to_dicts(self) -> list[dict[str, Any]]:
         return self.rows
