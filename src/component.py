@@ -93,9 +93,22 @@ class Component(ComponentBase):
         """
         Main execution code
         """
-        # Check for missing configuration parameters
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
+        self._initialize_state()
+        api_key, base_id, table_id, view_id, fields = self._extract_parameters()
+        api_options = self._setup_api_options(fields, view_id)
+
+        try:
+            self._process_table_data(api_key, base_id, table_id, api_options)
+        except HTTPError as err:
+            self._handle_http_error(err)
+
+        self.finalize_all_tables()
+        self.write_state_file(self.state)
+
+    def _initialize_state(self):
+        """Initialize state and date parameters."""
         self.state = self.get_state_file()
         self.last_run = self.state.get(KEY_STATE_LAST_RUN)
         self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -103,8 +116,9 @@ class Component(ComponentBase):
         self.date_to = self._get_date_to()
         self.state[KEY_TABLES_COLUMNS] = self.tables_columns = self.state.get(KEY_TABLES_COLUMNS, {})
 
+    def _extract_parameters(self) -> tuple[str, str, str, str | None, list[str] | None]:
+        """Extract and return configuration parameters."""
         params: dict = self.configuration.parameters
-        # Access parameters in data/config.json
         api_key: str = params[KEY_API_KEY]
         base_id: str = params[KEY_BASE_ID]
         table_id: str = params[KEY_TABLE_NAME]
@@ -113,7 +127,10 @@ class Component(ComponentBase):
         self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}).get(
             KEY_INCREMENTAL_LOAD
         )
+        return api_key, base_id, table_id, view_id, fields
 
+    def _setup_api_options(self, fields: list[str] | None, view_id: str | None) -> dict:
+        """Setup API options for Airtable query."""
         api_options = {}
         if self._fetching_is_incremental():
             api_options["formula"] = self._create_filter()
@@ -121,39 +138,34 @@ class Component(ComponentBase):
             api_options["fields"] = fields
         if view_id:
             api_options["view"] = view_id
+        return api_options
 
+    def _process_table_data(self, api_key: str, base_id: str, table_id: str, api_options: dict):
+        """Process table data from Airtable API."""
         retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
+        api_table = pyairtable.Table(api_key, base_id, table_id, retry_strategy=retry)
+        destination_table_name = self._get_result_table_name(api_table, table_id)
 
-        try:
-            api_table = pyairtable.Table(api_key, base_id, table_id, retry_strategy=retry)
-            destination_table_name = self._get_result_table_name(api_table, table_id)
+        logging.info(f"Downloading table: {destination_table_name}")
 
-            logging.info(f"Downloading table: {destination_table_name}")
+        schema_initialized = False
+        for record_batch in api_table.iterate(**api_options):
+            records = [process_record(r) for r in record_batch]
+            result_table = ResultTable.from_dicts(
+                destination_table_name,
+                records,
+                id_column_names=[RECORD_ID_FIELD_NAME],
+            )
 
-            schema_initialized = False
-            for record_batch in api_table.iterate(**api_options):
-                records = [process_record(r) for r in record_batch]
-                result_table = ResultTable.from_dicts(
-                    destination_table_name,
-                    records,
-                    id_column_names=[RECORD_ID_FIELD_NAME],
-                )
+            if result_table:
+                # Initialize schema and writers only once using the first batch
+                if not schema_initialized:
+                    self.initialize_table(result_table, api_table)
+                    schema_initialized = True
 
-                if result_table:
-                    # Initialize schema and writers only once using the first batch
-                    if not schema_initialized:
-                        self.initialize_table(result_table, api_table)
-                        schema_initialized = True
-
-                    self.process_table(result_table)
-                else:
-                    logging.warning("The result is empty!")
-
-        except HTTPError as err:
-            self._handle_http_error(err)
-
-        self.finalize_all_tables()
-        self.write_state_file(self.state)
+                self.process_table(result_table)
+            else:
+                logging.warning("The result is empty!")
 
     def _create_keboola_schema(self, api_table: pyairtable.Table, result_table: ResultTable):
         """
