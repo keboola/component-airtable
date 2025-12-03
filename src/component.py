@@ -1,6 +1,6 @@
 import logging
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Any
 from datetime import datetime, timezone
 import dateparser
 
@@ -58,7 +58,7 @@ def normalize_name(name: str):
     return HEADER_NORMALIZER.normalize_header([name])[0]
 
 
-def process_record(record: Dict) -> Dict:
+def process_record(record: dict) -> dict:
     fields = record["fields"]
     output_record = {
         RECORD_ID_FIELD_NAME: record["id"],
@@ -82,12 +82,12 @@ class Component(ComponentBase):
     def __init__(self):
         super().__init__()
 
-        self.table_definitions: Dict[str, TableDefinition] = {}
-        self.csv_writers: Dict[str, ElasticDictWriter] = {}
-        self.tables_columns = dict()
+        self.table_definitions: dict[str, TableDefinition] = {}
+        self.csv_writers: dict[str, ElasticDictWriter] = {}
+        self.tables_columns: dict[str, list[str]] = {}
         self.incremental_destination: bool = False
-        self.last_run = int()
-        self.state = dict()
+        self.last_run: str | None = None
+        self.state: dict[str, Any] = {}
 
     def run(self):
         """
@@ -97,7 +97,7 @@ class Component(ComponentBase):
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         self.state = self.get_state_file()
-        self.last_run = self.state.get(KEY_STATE_LAST_RUN, {}) or []
+        self.last_run = self.state.get(KEY_STATE_LAST_RUN)
         self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         self.date_from = self._get_date_from()
         self.date_to = self._get_date_to()
@@ -108,8 +108,8 @@ class Component(ComponentBase):
         api_key: str = params[KEY_API_KEY]
         base_id: str = params[KEY_BASE_ID]
         table_id: str = params[KEY_TABLE_NAME]
-        view_id: Optional[str] = params.get(KEY_VIEW_NAME)
-        fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
+        view_id: str | None = params.get(KEY_VIEW_NAME)
+        fields: list[str] | None = params.get(KEY_FIELDS, None)
         self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}).get(
             KEY_INCREMENTAL_LOAD
         )
@@ -312,13 +312,13 @@ class Component(ComponentBase):
         load_type = loading_options.get(KEY_SYNC_MODE)
         return load_type == "incremental_sync"
 
-    def _get_date_from(self) -> Optional[str]:
+    def _get_date_from(self) -> str | None:
         params = self.configuration.parameters
         loading_options = params.get(KEY_SYNC_OPTIONS, {})
         incremental = self._fetching_is_incremental()
         return self._get_parsed_date(loading_options.get(KEY_SYNC_DATE_FROM)) if incremental else None
 
-    def _get_date_to(self) -> Optional[str]:
+    def _get_date_to(self) -> str | None:
         params = self.configuration.parameters
         loading_options = params.get(KEY_SYNC_OPTIONS, {})
         incremental = self._fetching_is_incremental()
@@ -331,14 +331,13 @@ class Component(ComponentBase):
         if error.response.status_code == 401:
             message = (
                 "Request failed. Invalid credentials. Please verify your PAT token and the scopes allowed. "
-                f'Detail: {json_message["type"]}, {json_message["message"]}'
+                f"Detail: {json_message['type']}, {json_message['message']}"
             )
         else:
-            message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
+            message = f"Request failed: {json_message['type']}. Details: {json_message['message']}"
         raise UserException(message) from error
 
     def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
-
         destination_name = self.configuration.parameters.get(KEY_GROUP_DESTINATION, {}).get(KEY_TABLE_NAME, "")
 
         if not destination_name:
@@ -347,7 +346,7 @@ class Component(ComponentBase):
             destination_name = next(table["name"] for table in tables["tables"] if table["id"] == table_name)
         return destination_name
 
-    def _get_parsed_date(self, date_input: Optional[str]) -> Optional[str]:
+    def _get_parsed_date(self, date_input: str | None) -> str | None:
         if not date_input:
             parsed_date = None
         elif date_input.lower() in ["last", "last run"] and self.last_run:

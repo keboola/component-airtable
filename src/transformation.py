@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
-from typing import Any, Callable, Dict, Optional, Union, Type, List, MutableMapping
+from typing import Any, Callable, Union, Type, MutableMapping
 
 import typeguard
 from typeguard import TypeCheckError
@@ -26,8 +26,8 @@ def is_type(val, type: Type) -> bool:
 
 
 def flatten_dict(
-    dictionary: Dict,
-    parent_key: Optional[str] = None,
+    dictionary: dict,
+    parent_key: str | None = None,
     separator: str = SUBOBJECT_SEP,
     flatten_lists: bool = False,
 ):
@@ -46,9 +46,9 @@ def flatten_dict(
 
 class ColumnType(Enum):
     ELEMENTARY = ELEMENTARY_TYPE
-    OBJECT = Dict
-    ARRAY_OF_ELEMENTARY = List[ELEMENTARY_TYPE]
-    ARRAY_OF_OBJECTS = List[Dict]
+    OBJECT = dict
+    ARRAY_OF_ELEMENTARY = list[ELEMENTARY_TYPE]
+    ARRAY_OF_OBJECTS = list[dict]
 
     @classmethod
     def from_example_value(cls, example_value):
@@ -61,17 +61,19 @@ class ColumnType(Enum):
 @dataclass(slots=True)
 class ResultTable:
     name: str
-    id_column_names: List[str]
-    rows: List[Dict[str, Any]] = field(default_factory=list)
-    child_tables: Dict[str, "ResultTable"] = field(default_factory=dict)
+    id_column_names: list[str]
+    rows: list[dict[str, Any]] = field(default_factory=list)
+    child_tables: dict[str, "ResultTable"] = field(default_factory=dict)
 
     @classmethod
     def from_dicts(
         cls,
         name: str,
-        dicts: List[Dict[str, Any]],
-        id_column_names: List[str] = [RECORD_ID_FIELD_NAME],
+        dicts: list[dict[str, Any]],
+        id_column_names: list[str] | None = None,
     ):
+        if id_column_names is None:
+            id_column_names = [RECORD_ID_FIELD_NAME]
         if len(dicts) < 1:
             return None
         table = cls(name=name, id_column_names=id_column_names)
@@ -79,9 +81,8 @@ class ResultTable:
             table.add_row(row_dict)
         return table
 
-    def add_row(self, row_dict: Dict[str, Any]):
-
-        def add_value_to_row(column_name: str, value, row_dict: Dict[str, Any]):
+    def add_row(self, row_dict: dict[str, Any]):
+        def add_value_to_row(column_name: str, value, row_dict: dict[str, Any]):
             if value is None:
                 return
             column_type = ColumnType.from_example_value(value)
@@ -95,7 +96,12 @@ class ResultTable:
                 row_dict[column_name] = json.dumps(value)  # TODO?: maybe create child table instead?
             elif isinstance(value, list) and len(value) < 1:
                 row_dict[column_name] = ""
-            elif isinstance(value, list) and isinstance(value[0], dict) and value[0].get("error", None):
+            elif (
+                isinstance(value, list)
+                and len(value) > 0
+                and isinstance(value[0], dict)
+                and value[0].get("error", None)
+            ):
                 row_dict[column_name] = value[0].get("error")
             elif column_type is ColumnType.ARRAY_OF_OBJECTS:
                 child_table_name = f"{self.name}{CHILD_TABLE_SEP}{column_name}"
@@ -112,7 +118,7 @@ class ResultTable:
                 self.child_tables[child_table_name] = child_table
                 # Add parent id to child table
                 for child_dict in value:
-                    child_dict: Dict
+                    child_dict: dict
                     if RECORD_ID_FIELD_NAME in row_dict:
                         child_dict[PARENT_ID_COLUMN_NAME] = row_dict[RECORD_ID_FIELD_NAME]
                     child_table.add_row(child_dict)
@@ -133,5 +139,5 @@ class ResultTable:
     def rename_columns(self, rename_function: Callable[[str], str]):
         self.rows = [{rename_function(k): v for k, v in row.items()} for row in self.rows]
 
-    def to_dicts(self) -> List[Dict[str, Any]]:
+    def to_dicts(self) -> list[dict[str, Any]]:
         return self.rows
