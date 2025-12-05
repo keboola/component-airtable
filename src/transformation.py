@@ -8,6 +8,7 @@ from typing import Any, Callable, Type, Union
 import typeguard
 from typeguard import TypeCheckError
 
+# Constants defined here to avoid circular imports with component.py
 SUBOBJECT_SEP = "_"
 CHILD_TABLE_SEP = "__"
 RECORD_ID_FIELD_NAME = "record_id"

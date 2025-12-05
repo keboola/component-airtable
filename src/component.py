@@ -1,6 +1,5 @@
 import logging
 from collections import OrderedDict
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,9 +21,17 @@ from pyairtable import Api, Base, retry_strategy
 from pyairtable import Table as ApiTable
 from requests import HTTPError
 
-from transformation import RECORD_ID_FIELD_NAME, ResultTable
+from configuration import Configuration
+from transformation import ResultTable
 
-# Configuration variables
+# Transformation constants
+SUBOBJECT_SEP = "_"
+CHILD_TABLE_SEP = "__"
+RECORD_ID_FIELD_NAME = "record_id"
+ARRAY_OBJECTS_ID_FIELD_NAME = "id"
+PARENT_ID_COLUMN_NAME = "parent_id"
+
+# Configuration key constants
 KEY_API_KEY = "#api_key"
 KEY_BASE_ID = "base_id"
 KEY_TABLE_NAME = "table_name"
@@ -45,44 +52,11 @@ KEY_SYNC_DATE_TO = "date_to"
 KEY_STATE_LAST_RUN = "last_run"
 KEY_TABLES_COLUMNS = "tables_columns"
 
-# list of mandatory parameters => if some is missing,
-# component will fail with readable message on initialization.
-REQUIRED_PARAMETERS = [KEY_API_KEY, KEY_BASE_ID, KEY_TABLE_NAME]
-REQUIRED_IMAGE_PARS = []
-
+# Other constants
 RECORD_CREATED_TIME_FIELD_NAME = "record_created_time"
 
 SUB = "_"
 HEADER_NORMALIZER = DefaultHeaderNormalizer(forbidden_sub=SUB)
-
-
-@dataclass
-class AirtableConfig:
-    """Configuration for Airtable component."""
-
-    api_key: str
-    base_id: str
-    table_name: str
-    view_name: str | None = None
-    fields: list[str] | None = None
-    incremental_loading: bool = True
-    sync_options: dict[str, Any] = field(default_factory=dict)
-    destination: dict[str, Any] = field(default_factory=dict)
-
-    @classmethod
-    def from_parameters(cls, params: dict[str, Any]) -> "AirtableConfig":
-        """Create configuration from raw parameters dictionary."""
-        destination = params.get(KEY_GROUP_DESTINATION, {})
-        return cls(
-            api_key=params[KEY_API_KEY],
-            base_id=params[KEY_BASE_ID],
-            table_name=params[KEY_TABLE_NAME],
-            view_name=params.get(KEY_VIEW_NAME),
-            fields=params.get(KEY_FIELDS),
-            incremental_loading=destination.get(KEY_INCREMENTAL_LOAD, True),
-            sync_options=params.get(KEY_SYNC_OPTIONS, {}),
-            destination=destination,
-        )
 
 
 def normalize_name(name: str) -> str:
@@ -113,15 +87,16 @@ class Component(ComponentBase):
     def __init__(self):
         super().__init__()
 
-        # Validate and load configuration
-        self.validate_configuration_parameters(REQUIRED_PARAMETERS)
-        self.validate_image_parameters(REQUIRED_IMAGE_PARS)
-        self.config = AirtableConfig.from_parameters(self.configuration.parameters)
+        # Load and validate configuration using Pydantic model
+        self.config = Configuration(**self.configuration.parameters)
 
         # Initialize API client with retry strategy
         retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
         self.api_table = ApiTable(
-            self.config.api_key, self.config.base_id, self.config.table_name, retry_strategy=retry
+            self.config.api_key,
+            self.config.base_id,
+            self.config.table_name,
+            retry_strategy=retry,
         )
         self.api = Api(self.config.api_key)
 
@@ -135,7 +110,7 @@ class Component(ComponentBase):
         self.table_definitions: dict[str, TableDefinition] = {}
         self.csv_writers: dict[str, ElasticDictWriter] = {}
         self.tables_columns: dict[str, list[str]] = self.state.get(KEY_TABLES_COLUMNS, {})
-        self.incremental_destination: bool = self.config.incremental_loading
+        self.incremental_destination: bool = self.config.destination.incremental_loading
 
     def run(self) -> None:
         """
@@ -214,7 +189,9 @@ class Component(ComponentBase):
         return field_type_map
 
     def _create_keboola_schema(
-        self, result_table: ResultTable, field_type_map: dict[str, SupportedDataTypes] | None = None
+        self,
+        result_table: ResultTable,
+        field_type_map: dict[str, SupportedDataTypes] | None = None,
     ) -> OrderedDict[str, ColumnDefinition]:
         """
         Create Keboola schema based on actual ResultTable columns.
@@ -352,16 +329,15 @@ class Component(ComponentBase):
             csv_writer.close()
 
     def _fetching_is_incremental(self) -> bool:
-        load_type = self.config.sync_options.get(KEY_SYNC_MODE)
-        return load_type == "incremental_sync"
+        return self.config.is_incremental_sync()
 
     def _get_date_from(self) -> str | None:
         incremental = self._fetching_is_incremental()
-        return self._get_parsed_date(self.config.sync_options.get(KEY_SYNC_DATE_FROM)) if incremental else None
+        return self._get_parsed_date(self.config.sync_options.date_from) if incremental else None
 
     def _get_date_to(self) -> str | None:
         incremental = self._fetching_is_incremental()
-        return self._get_parsed_date(self.config.sync_options.get(KEY_SYNC_DATE_TO)) if incremental else None
+        return self._get_parsed_date(self.config.sync_options.date_to) if incremental else None
 
     @staticmethod
     def _handle_http_error(error: HTTPError) -> None:
@@ -370,14 +346,14 @@ class Component(ComponentBase):
         if error.response.status_code == 401:
             message = (
                 "Request failed. Invalid credentials. Please verify your PAT token and the scopes allowed. "
-                f'Detail: {json_message["type"]}, {json_message["message"]}'
+                f"Detail: {json_message['type']}, {json_message['message']}"
             )
         else:
-            message = f'Request failed: {json_message["type"]}. Details: {json_message["message"]}'
+            message = f"Request failed: {json_message['type']}. Details: {json_message['message']}"
         raise UserException(message) from error
 
     def _get_result_table_name(self, api_table: pyairtable.Table, table_name: str) -> str:
-        destination_name = self.config.destination.get(KEY_TABLE_NAME, "")
+        destination_name = self.config.destination.table_name
 
         if not destination_name:
             # see comments in list_fields() why it is necessary to use get_base_schema()

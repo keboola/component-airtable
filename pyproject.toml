@@ -12,6 +12,7 @@ dependencies = [
     "keboola-utils>=1.1.0",
     "mock>=5.0.2",
     "pyairtable==1.4.0",
+    "pydantic>=2.0.0",
     "typeguard>=3.0.2",
 ]
 
