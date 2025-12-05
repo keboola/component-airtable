@@ -26,10 +26,10 @@ class Configuration(BaseModel):
 
     # Required parameters
     api_key: str = Field(alias="#api_key")
-    base_id: str
-    table_name: str
 
-    # Optional parameters
+    # Optional parameters - only required for certain actions
+    base_id: str = ""
+    table_name: str = ""
     view_name: str = ""
     fields: list[str] = Field(default_factory=list)
 
@@ -48,22 +48,6 @@ class Configuration(BaseModel):
         """Validate that API key is provided."""
         if not v or v.strip() == "":
             raise ValueError("API key is required")
-        return v
-
-    @field_validator("base_id")
-    @classmethod
-    def validate_base_id(cls, v: str) -> str:
-        """Validate that base ID is provided."""
-        if not v or v.strip() == "":
-            raise ValueError("Base ID is required")
-        return v
-
-    @field_validator("table_name")
-    @classmethod
-    def validate_table_name(cls, v: str) -> str:
-        """Validate that table name is provided."""
-        if not v or v.strip() == "":
-            raise ValueError("Table name is required")
         return v
 
     def __init__(self, **data: Any):

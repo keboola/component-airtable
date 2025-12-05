@@ -206,6 +206,28 @@ class TestComponent(unittest.TestCase):
         self.assertTrue((out_dir / "tables" / "airtable_contracts.csv").exists())
         self.assertTrue((out_dir / "tables" / "airtable_contracts.csv.manifest").exists())
 
+    @mock.patch("component.pyairtable.metadata.get_api_bases")
+    def test_connection_without_base_and_table(self, mock_get_api_bases):
+        """Test that testConnection works with only API key, no base_id or table_name."""
+        # Mock the API bases response
+        mock_get_api_bases.return_value = {
+            "bases": [
+                {"id": "appTestBase1", "name": "Test Base 1"},
+                {"id": "appTestBase2", "name": "Test Base 2"},
+            ]
+        }
+
+        # Set up test environment with only API key
+        path = os.path.join(os.path.dirname(__file__), "data", "test_connection_only")
+        os.environ["KBC_DATADIR"] = path
+
+        # Create component and run testConnection
+        comp = Component()
+        comp.test_connection()
+
+        # If we get here without exception, the test passed
+        self.assertTrue(True)
+
 
 if __name__ == "__main__":
     # import sys;sys.argv = ['', 'Test.testName']

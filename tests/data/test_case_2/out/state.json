@@ -1,1 +1,1 @@
-{"last_run": "2010-10-10 00:00:00", "tables_columns": {"airtable_contracts": ["record_id", "record_created_time", "Last_Name___", "Ci____ty", "Email", "Phone_2_", "Index", "Customer_Id", "_Company_", "Website", "Subscription_Date", "Phone_1", "First_Name", "Country"]}}
+{"last_run": "2010-10-10 00:00:00", "tables_columns": {"airtable_contracts": ["record_id", "record_created_time", "Customer_Id", "Email", "Index", "First_Name", "Country", "Last_Name___", "Subscription_Date", "Phone_1", "Ci____ty", "_Company_", "Website", "Phone_2_"]}}

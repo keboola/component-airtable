@@ -90,15 +90,20 @@ class Component(ComponentBase):
         # Load and validate configuration using Pydantic model
         self.config = Configuration(**self.configuration.parameters)
 
-        # Initialize API client with retry strategy
-        retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
-        self.api_table = ApiTable(
-            self.config.api_key,
-            self.config.base_id,
-            self.config.table_name,
-            retry_strategy=retry,
-        )
+        # Initialize API client
         self.api = Api(self.config.api_key)
+
+        # Initialize API table client only if base_id and table_name are provided
+        # (not needed for some sync actions like testConnection, list_bases)
+        self.api_table = None
+        if self.config.base_id and self.config.table_name:
+            retry = retry_strategy(status_forcelist=(429, 500, 502, 503, 504), backoff_factor=0.5, total=10)
+            self.api_table = ApiTable(
+                self.config.api_key,
+                self.config.base_id,
+                self.config.table_name,
+                retry_strategy=retry,
+            )
 
         # Initialize state
         self.state: dict = self.get_state_file()
@@ -116,6 +121,14 @@ class Component(ComponentBase):
         """
         Main execution code
         """
+        # Validate required fields for run
+        if not self.config.base_id:
+            raise UserException("Base ID is required for data extraction")
+        if not self.config.table_name:
+            raise UserException("Table name is required for data extraction")
+        if not self.api_table:
+            raise UserException("API table client not initialized. This should not happen.")
+
         # Update state with current run time
         self.state[KEY_STATE_LAST_RUN] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         self.date_from = self._get_date_from()
@@ -411,11 +424,19 @@ class Component(ComponentBase):
     @sync_action("list_fields")
     def list_fields(self) -> list[dict[str, str]]:
         """List available fields from the configured table."""
+        if not self.config.base_id:
+            raise UserException("Base ID is required for listing fields")
+        if not self.config.table_name:
+            raise UserException("Table name is required for listing fields")
         return self._list_table_attributes("fields")
 
     @sync_action("list_views")
     def list_views(self) -> list[dict[str, str]]:
         """List available views from the configured table."""
+        if not self.config.base_id:
+            raise UserException("Base ID is required for listing views")
+        if not self.config.table_name:
+            raise UserException("Table name is required for listing views")
         return self._list_table_attributes("views")
 
     @sync_action("list_bases")
@@ -435,6 +456,8 @@ class Component(ComponentBase):
     @sync_action("list_tables")
     def list_tables(self) -> list[dict[str, str]]:
         """List all tables in the configured base."""
+        if not self.config.base_id:
+            raise UserException("Base ID is required for listing tables")
         base = Base(self.config.api_key, self.config.base_id)
         tables = pyairtable.metadata.get_base_schema(base)
         return [dict(value=table["id"], label=f"{table['name']} ({table['id']})") for table in tables["tables"]]

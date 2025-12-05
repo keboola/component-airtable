@@ -1,0 +1,6 @@
+{
+  "action": "testConnection",
+  "parameters": {
+    "#api_key": "patMockApiKey123.abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+  }
+}
