@@ -1,9 +1,11 @@
-import sys
 import os
+import sys
 import unittest
-import mock
 from pathlib import Path
+
+import mock
 from freezegun import freeze_time
+
 from component import Component
 
 # Add src directory to path for imports
@@ -11,7 +13,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 class TestComponent(unittest.TestCase):
-
     # set global time to 2010-10-10 - affects functions like datetime.now()
     @freeze_time("2010-10-10")
     # set KBC_DATADIR env to non-existing dir
@@ -21,7 +22,7 @@ class TestComponent(unittest.TestCase):
             comp = Component()
             comp.run()
 
-    def _run_test_case(self, case_name):
+    def _run_test_case(self, case_name: str) -> Path:
         """Helper to run a test case by name."""
         path = os.path.join(os.path.dirname(__file__), "data", case_name)
         os.environ["KBC_DATADIR"] = path
@@ -68,17 +69,29 @@ class TestComponent(unittest.TestCase):
                 {
                     "id": "rec123",
                     "createdTime": "2024-01-15T10:30:00.000Z",
-                    "fields": {"Name": "Test Record 1", "Status": "Active", "Priority": "1"},
+                    "fields": {
+                        "Name": "Test Record 1",
+                        "Status": "Active",
+                        "Priority": "1",
+                    },
                 },
                 {
                     "id": "rec456",
                     "createdTime": "2024-01-15T11:00:00.000Z",
-                    "fields": {"Name": "Test Record 2", "Status": "Completed", "Priority": "2"},
+                    "fields": {
+                        "Name": "Test Record 2",
+                        "Status": "Completed",
+                        "Priority": "2",
+                    },
                 },
                 {
                     "id": "rec789",
                     "createdTime": "2024-01-15T12:00:00.000Z",
-                    "fields": {"Name": "Test Record 3", "Status": "Pending", "Priority": "3"},
+                    "fields": {
+                        "Name": "Test Record 3",
+                        "Status": "Pending",
+                        "Priority": "3",
+                    },
                 },
             ]
         ]

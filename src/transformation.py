@@ -2,8 +2,7 @@ import json
 from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
-from types import NoneType
-from typing import Any, Callable, Type, Union
+from typing import Any, Callable
 
 import typeguard
 from typeguard import TypeCheckError
@@ -15,12 +14,12 @@ RECORD_ID_FIELD_NAME = "record_id"
 ARRAY_OBJECTS_ID_FIELD_NAME = "id"
 PARENT_ID_COLUMN_NAME = "parent_id"
 
-ELEMENTARY_TYPE = Union[int, float, str, bool, NoneType]
+ELEMENTARY_TYPE = int | float | str | bool | None
 
 
-def is_type(val, type: Type) -> bool:
+def is_type(val, expected_type: type) -> bool:
     try:
-        typeguard.check_type(val, type)
+        typeguard.check_type(val, expected_type)
     except TypeCheckError:
         return False
     else:
@@ -82,7 +81,6 @@ class ResultTable:
         return table
 
     def add_row(self, row_dict: dict[str, Any]):
-
         def add_value_to_row(column_name: str, value, row_dict: dict[str, Any]):
             if value is None:
                 return

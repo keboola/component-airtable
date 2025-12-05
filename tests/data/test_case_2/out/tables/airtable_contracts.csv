@@ -1,4 +1,4 @@
-record_id,record_created_time,Customer_Id,Email,Index,First_Name,Country,Last_Name___,Subscription_Date,Phone_1,Ci____ty,_Company_,Website,Phone_2_
-rec00838jsiDO8Hau,2025-11-19T16:47:09.000Z,Dc3Eb2268524A69,raymond98@oconnell.info,7749,James,Indonesia,Hines,2020-05-19,989-616-0860,New Russell,"Ramsey, Barr and Dawson",http://gross.biz/,719-624-0683x1496
-rec027WtYu7rZJycP,2025-11-19T16:47:09.000Z,a1A7c5d6B086dBF,shelleyleonard@carlson.net,2145,Holly,Honduras,Lin,2021-06-02,218.645.5150x16428,Baldwinfort,"Garrett, Fuentes and Olson",https://grimes-fry.com/,860-912-6407
-rec02Gs4OYtZ72dtw,2025-11-19T16:47:09.000Z,a23B9b1B24455Bd,conneraaron@villegas-herring.com,4394,Julia,Niue,Bradford,2021-01-16,001-458-732-7019x0126,New Jefftown,"Hodges, Whitehead and Hobbs",https://kaufman.com/,652.880.5694x7294
+record_id,record_created_time,Phone_1,Website,Customer_Id,_Company_,First_Name,Index,Ci____ty,Country,Last_Name___,Phone_2_,Email,Subscription_Date
+rec00838jsiDO8Hau,2025-11-19T16:47:09.000Z,989-616-0860,http://gross.biz/,Dc3Eb2268524A69,"Ramsey, Barr and Dawson",James,7749,New Russell,Indonesia,Hines,719-624-0683x1496,raymond98@oconnell.info,2020-05-19
+rec027WtYu7rZJycP,2025-11-19T16:47:09.000Z,218.645.5150x16428,https://grimes-fry.com/,a1A7c5d6B086dBF,"Garrett, Fuentes and Olson",Holly,2145,Baldwinfort,Honduras,Lin,860-912-6407,shelleyleonard@carlson.net,2021-06-02
+rec02Gs4OYtZ72dtw,2025-11-19T16:47:09.000Z,001-458-732-7019x0126,https://kaufman.com/,a23B9b1B24455Bd,"Hodges, Whitehead and Hobbs",Julia,4394,New Jefftown,Niue,Bradford,652.880.5694x7294,conneraaron@villegas-herring.com,2021-01-16

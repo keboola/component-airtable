@@ -63,7 +63,7 @@ def normalize_name(name: str) -> str:
     return HEADER_NORMALIZER.normalize_header([name])[0]
 
 
-def process_record(record: dict) -> dict:
+def process_record(record: dict[str, Any]) -> dict[str, Any]:
     fields = record["fields"]
     output_record = {
         RECORD_ID_FIELD_NAME: record["id"],
