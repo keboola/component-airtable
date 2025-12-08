@@ -25,28 +25,7 @@ from configuration import Configuration
 from transformation import ResultTable
 
 # Transformation constants
-SUBOBJECT_SEP = "_"
-CHILD_TABLE_SEP = "__"
 RECORD_ID_FIELD_NAME = "record_id"
-ARRAY_OBJECTS_ID_FIELD_NAME = "id"
-PARENT_ID_COLUMN_NAME = "parent_id"
-
-# Configuration key constants
-KEY_API_KEY = "#api_key"
-KEY_BASE_ID = "base_id"
-KEY_TABLE_NAME = "table_name"
-KEY_USE_VIEW = "use_view"
-KEY_VIEW_NAME = "view_name"
-KEY_FIELDS = "fields"
-KEY_INCREMENTAL_LOAD = "incremental_loading"
-KEY_GROUP_DESTINATION = "destination"
-
-# Sync options variables
-KEY_SYNC_OPTIONS = "sync_options"
-KEY_SYNC_MODE = "sync_mode"
-KEY_SYNC_MODE_INCREMENTAL = "incremental_sync"
-KEY_SYNC_DATE_FROM = "date_from"
-KEY_SYNC_DATE_TO = "date_to"
 
 # State variables
 KEY_STATE_LAST_RUN = "last_run"
