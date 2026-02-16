@@ -1,0 +1,28 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "newestest_table.csv": {
+      "columns": [
+        "record_id",
+        "record_created_time",
+        "ID",
+        "Name",
+        "Category",
+        "Score",
+        "Created",
+        "Phone"
+      ],
+      "hash": "sha256:9d064a51e490b0fdfd8a6ebbc50869e7cc7a92ada41694b0eb70136a6e7bbf35",
+      "row_count": 51,
+      "size_bytes": 4794
+    },
+    "newestest_table.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:2bc04c3989e7e0b1329471bf78ed7047700c797f6d6149979e80f8315da141c1",
+      "row_count": null,
+      "size_bytes": 1337
+    }
+  },
+  "version": "1.0"
+}

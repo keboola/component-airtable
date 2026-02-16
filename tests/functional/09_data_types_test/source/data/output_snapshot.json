@@ -1,0 +1,51 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "dtypes.csv": {
+      "columns": [
+        "record_id",
+        "record_created_time",
+        "Name",
+        "Checkbox",
+        "Assignee_id",
+        "Assignee_email",
+        "Assignee_name",
+        "Phone",
+        "Email",
+        "Attachment_Summary_state",
+        "Attachment_Summary_isStale",
+        "Long_Text",
+        "Multi_select",
+        "Single_select",
+        "Date",
+        "Url",
+        "Int",
+        "Float",
+        "Cur",
+        "Percent",
+        "Duration",
+        "Rating",
+        "Formlua",
+        "Last_modified_by_id",
+        "Last_modified_by_email",
+        "Last_modified_by_name",
+        "Created_time",
+        "Created_time_copy_label",
+        "Created_time_copy_url",
+        "Last_modified",
+        "Autonumber"
+      ],
+      "hash": "sha256:e9badd3e2cc2ff030ea893f768f399c1e60ed970c2b402034cecb3eea25d22de",
+      "row_count": 2,
+      "size_bytes": 903
+    },
+    "dtypes.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:25a7f5706dcd7fc1d3197be4c586604e031226e41f4925bc85d0a8d43d40de3f",
+      "row_count": null,
+      "size_bytes": 4838
+    }
+  },
+  "version": "1.0"
+}

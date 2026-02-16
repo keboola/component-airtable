@@ -1,0 +1,6 @@
+{
+  "action": "list_bases",
+  "parameters": {
+    "#api_key": "DUMMY_KEY"
+  }
+}

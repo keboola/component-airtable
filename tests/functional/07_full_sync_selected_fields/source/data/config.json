@@ -1,0 +1,20 @@
+{
+  "action": "run",
+  "parameters": {
+    "#api_key": "DUMMY_KEY",
+    "base_id": "appzV7dFEMhqPUVwV",
+    "table_name": "tblPZ470gefp4kr2c",
+    "fields": [
+      "fldBDloouy1K1kVD0",
+      "fldmPsQrJFKudKhwq",
+      "fldocsTJojlWrWyEU"
+    ],
+    "sync_options": {
+      "sync_mode": "full_sync"
+    },
+    "destination": {
+      "table_name": "newestest_table_subset",
+      "incremental_loading": false
+    }
+  }
+}

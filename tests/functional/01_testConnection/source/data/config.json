@@ -1,0 +1,6 @@
+{
+  "action": "testConnection",
+  "parameters": {
+    "#api_key": "DUMMY_KEY"
+  }
+}

@@ -1,0 +1,289 @@
+{
+  "incremental": false,
+  "write_always": false,
+  "delimiter": ",",
+  "enclosure": "\"",
+  "manifest_type": "out",
+  "has_header": true,
+  "schema": [
+    {
+      "name": "record_id",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "primary_key": true
+    },
+    {
+      "name": "record_created_time",
+      "data_type": {
+        "base": {
+          "type": "TIMESTAMP"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Name",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Checkbox",
+      "data_type": {
+        "base": {
+          "type": "BOOLEAN"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Assignee_id",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Assignee_email",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Assignee_name",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Phone",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Email",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Attachment_Summary_state",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Attachment_Summary_isStale",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Long_Text",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Multi_select",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Single_select",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Date",
+      "data_type": {
+        "base": {
+          "type": "DATE"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Url",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Int",
+      "data_type": {
+        "base": {
+          "type": "INTEGER"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Float",
+      "data_type": {
+        "base": {
+          "type": "FLOAT"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Cur",
+      "data_type": {
+        "base": {
+          "type": "FLOAT"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Percent",
+      "data_type": {
+        "base": {
+          "type": "FLOAT"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Duration",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Rating",
+      "data_type": {
+        "base": {
+          "type": "INTEGER"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Formlua",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Last_modified_by_id",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Last_modified_by_email",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Last_modified_by_name",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Created_time",
+      "data_type": {
+        "base": {
+          "type": "TIMESTAMP"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Created_time_copy_label",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Created_time_copy_url",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Last_modified",
+      "data_type": {
+        "base": {
+          "type": "TIMESTAMP"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "Autonumber",
+      "data_type": {
+        "base": {
+          "type": "INTEGER"
+        }
+      },
+      "nullable": true
+    }
+  ]
+}

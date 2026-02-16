@@ -1,0 +1,39 @@
+{
+  "_metadata": {
+    "datadirtest_version": "1.9.0",
+    "freeze_time": "2025-01-01T12:00:00",
+    "recorded_at": "2026-02-16T14:41:00.083458+00:00"
+  },
+  "interactions": [
+    {
+      "request": {
+        "body": null,
+        "headers": {
+          "Accept": [
+            "*/*"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://api.airtable.com/v0/meta/bases"
+      },
+      "response": {
+        "body": {
+          "string": "{\"bases\": [{\"id\": \"appzV7dFEMhqPUVwV\", \"name\": \"Product Planning\", \"permissionLevel\": \"create\"}, {\"id\": \"appNysum7kWY49CdH\", \"name\": \"Product Launch\", \"permissionLevel\": \"create\"}, {\"id\": \"app3pjeXKl2pRteFM\", \"name\": \"Digital Content Calendar\", \"permissionLevel\": \"create\"}, {\"id\": \"appAIy495m0RrjdnZ\", \"name\": \"User Studies\", \"permissionLevel\": \"create\"}, {\"id\": \"appVXvj2ipQrmrmLq\", \"name\": \"Sales CRM\", \"permissionLevel\": \"create\"}, {\"id\": \"appaa0yYISkw0F9xO\", \"name\": \"Project Tracker\", \"permissionLevel\": \"create\"}, {\"id\": \"appSCMbFa4hi2uqt2\", \"name\": \"Component Creation Scoping\", \"permissionLevel\": \"create\"}, {\"id\": \"appeB7RPxcIMhMvqn\", \"name\": \"LookerJoin\", \"permissionLevel\": \"create\"}, {\"id\": \"appxDZ88j6DBq80NU\", \"name\": \"E-shop Example\", \"permissionLevel\": \"create\"}]}"
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=utf-8"
+          ],
+          "content-length": [
+            "727"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        }
+      }
+    }
+  ],
+  "version": 1
+}

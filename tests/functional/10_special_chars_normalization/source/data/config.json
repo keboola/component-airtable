@@ -1,0 +1,15 @@
+{
+  "action": "run",
+  "parameters": {
+    "#api_key": "DUMMY_KEY",
+    "base_id": "appzV7dFEMhqPUVwV",
+    "table_name": "tblPZ470gefp4kr2c",
+    "sync_options": {
+      "sync_mode": "full_sync"
+    },
+    "destination": {
+      "table_name": "",
+      "incremental_loading": false
+    }
+  }
+}

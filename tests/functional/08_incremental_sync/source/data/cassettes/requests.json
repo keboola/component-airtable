@@ -1,0 +1,39 @@
+{
+  "_metadata": {
+    "datadirtest_version": "1.9.0",
+    "freeze_time": "2025-01-01T12:00:00",
+    "recorded_at": "2026-02-16T14:41:08.776741+00:00"
+  },
+  "interactions": [
+    {
+      "request": {
+        "body": null,
+        "headers": {
+          "Accept": [
+            "*/*"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://api.airtable.com/v0/appzV7dFEMhqPUVwV/tblPZ470gefp4kr2c?filterByFormula=AND%28IS_AFTER%28IF%28NOT%28LAST_MODIFIED_TIME%28%29%29%2CSET_TIMEZONE%28CREATED_TIME%28%29%2C%27UTC%27%29%2CSET_TIMEZONE%28LAST_MODIFIED_TIME%28%29%2C%27UTC%27%29%29%2CSET_TIMEZONE%28%272024-01-01+00%3A00%3A00%27%2C%27UTC%27%29%29%2CIS_BEFORE%28IF%28NOT%28LAST_MODIFIED_TIME%28%29%29%2CSET_TIMEZONE%28CREATED_TIME%28%29%2C%27UTC%27%29%2CSET_TIMEZONE%28LAST_MODIFIED_TIME%28%29%2C%27UTC%27%29%29%2CSET_TIMEZONE%28%272025-01-01+12%3A00%3A00%27%2C%27UTC%27%29%29%29"
+      },
+      "response": {
+        "body": {
+          "string": "{\"records\": []}"
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json; charset=utf-8"
+          ],
+          "content-length": [
+            "14"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        }
+      }
+    }
+  ],
+  "version": 1
+}

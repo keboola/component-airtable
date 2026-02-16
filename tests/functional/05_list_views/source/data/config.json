@@ -1,0 +1,8 @@
+{
+  "action": "list_views",
+  "parameters": {
+    "#api_key": "DUMMY_KEY",
+    "base_id": "appzV7dFEMhqPUVwV",
+    "table_name": "tblPZ470gefp4kr2c"
+  }
+}

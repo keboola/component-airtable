@@ -1,0 +1,25 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "newestest_table_subset.csv": {
+      "columns": [
+        "record_id",
+        "record_created_time",
+        "ID",
+        "Name",
+        "Score"
+      ],
+      "hash": "sha256:394a9bc195de08a40f6fb0d756fb87cc029f96b8968e31630abb3001093d5402",
+      "row_count": 51,
+      "size_bytes": 3108
+    },
+    "newestest_table_subset.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:c8b42609ca685ee3cc00f98a9d219c0a4fd03096c293d53367e1461e3e5b5778",
+      "row_count": null,
+      "size_bytes": 900
+    }
+  },
+  "version": "1.0"
+}

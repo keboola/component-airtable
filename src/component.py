@@ -207,9 +207,10 @@ class Component(ComponentBase):
         )
 
         # Get columns from first row (all rows should have same structure after processing)
-        actual_columns = set()
+        # Use list(dict.keys()) to preserve insertion order (deterministic)
+        actual_columns = []
         if result_table.rows:
-            actual_columns = set(result_table.rows[0].keys())
+            actual_columns = list(result_table.rows[0].keys())
 
         # Add schema for all actual columns (except built-ins already added)
         for column_name in actual_columns:

@@ -1,0 +1,7 @@
+{
+  "action": "list_tables",
+  "parameters": {
+    "#api_key": "DUMMY_KEY",
+    "base_id": "appzV7dFEMhqPUVwV"
+  }
+}

@@ -33,6 +33,8 @@ exclude = '''
 [dependency-groups]
 dev = [
     "black>=25.9.0",
+    "datadirtest[vcr] @ git+https://github.com/keboola/datadirtest.git@feature/vcr-testing",
     "flake8>=7.3.0",
+    "pytest>=9.0.0",
     "ruff>=0.13.3",
 ]
