@@ -1,0 +1,155 @@
+[
+  {
+    "name": "01_testConnection",
+    "description": "Test API connection with valid credentials",
+    "config": {
+      "action": "testConnection",
+      "parameters": {
+        "#api_key": "DUMMY_KEY"
+      }
+    }
+  },
+  {
+    "name": "02_list_bases",
+    "description": "List all accessible Airtable bases",
+    "config": {
+      "action": "list_bases",
+      "parameters": {
+        "#api_key": "DUMMY_KEY"
+      }
+    }
+  },
+  {
+    "name": "03_list_tables",
+    "description": "List tables in a base",
+    "config": {
+      "action": "list_tables",
+      "parameters": {
+        "#api_key": "DUMMY_KEY",
+        "base_id": "appzV7dFEMhqPUVwV"
+      }
+    }
+  },
+  {
+    "name": "04_list_fields",
+    "description": "List fields in a table",
+    "config": {
+      "action": "list_fields",
+      "parameters": {
+        "#api_key": "DUMMY_KEY",
+        "base_id": "appzV7dFEMhqPUVwV",
+        "table_name": "tblPZ470gefp4kr2c"
+      }
+    }
+  },
+  {
+    "name": "05_list_views",
+    "description": "List views in a table",
+    "config": {
+      "action": "list_views",
+      "parameters": {
+        "#api_key": "DUMMY_KEY",
+        "base_id": "appzV7dFEMhqPUVwV",
+        "table_name": "tblPZ470gefp4kr2c"
+      }
+    }
+  },
+  {
+    "name": "06_full_sync_all_fields",
+    "description": "Full sync extraction with all fields from small table (50 records)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "#api_key": "DUMMY_KEY",
+        "base_id": "appzV7dFEMhqPUVwV",
+        "table_name": "tblPZ470gefp4kr2c",
+        "sync_options": {
+          "sync_mode": "full_sync"
+        },
+        "destination": {
+          "table_name": "newestest_table",
+          "incremental_loading": false
+        }
+      }
+    }
+  },
+  {
+    "name": "07_full_sync_selected_fields",
+    "description": "Full sync with field selection (ID, Name, Score)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "#api_key": "DUMMY_KEY",
+        "base_id": "appzV7dFEMhqPUVwV",
+        "table_name": "tblPZ470gefp4kr2c",
+        "fields": ["fldBDloouy1K1kVD0", "fldmPsQrJFKudKhwq", "fldocsTJojlWrWyEU"],
+        "sync_options": {
+          "sync_mode": "full_sync"
+        },
+        "destination": {
+          "table_name": "newestest_table_subset",
+          "incremental_loading": false
+        }
+      }
+    }
+  },
+  {
+    "name": "08_incremental_sync",
+    "description": "Incremental sync with date filtering",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "#api_key": "DUMMY_KEY",
+        "base_id": "appzV7dFEMhqPUVwV",
+        "table_name": "tblPZ470gefp4kr2c",
+        "sync_options": {
+          "sync_mode": "incremental_sync",
+          "date_from": "2024-01-01",
+          "date_to": "now"
+        },
+        "destination": {
+          "table_name": "newestest_table_incremental",
+          "incremental_loading": true
+        }
+      }
+    }
+  },
+  {
+    "name": "09_data_types_test",
+    "description": "Test complex field types (checkbox, attachments, select, formula, etc.)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "#api_key": "DUMMY_KEY",
+        "base_id": "appzV7dFEMhqPUVwV",
+        "table_name": "tblckPq8TR5kXYqPB",
+        "sync_options": {
+          "sync_mode": "full_sync"
+        },
+        "destination": {
+          "table_name": "dtypes",
+          "incremental_loading": false
+        }
+      }
+    }
+  },
+  {
+    "name": "10_special_chars_normalization",
+    "description": "Test column name normalization with special characters (auto-resolved table name)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "#api_key": "DUMMY_KEY",
+        "base_id": "appzV7dFEMhqPUVwV",
+        "table_name": "tblPZ470gefp4kr2c",
+        "sync_options": {
+          "sync_mode": "full_sync"
+        },
+        "destination": {
+          "table_name": "",
+          "incremental_loading": false
+        }
+      }
+    }
+  }
+]

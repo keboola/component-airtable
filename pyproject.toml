@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = "~=3.13.0"
 dependencies = [
     "freezegun>=1.5.1",
-    "keboola-component>=1.6.10",
+    "keboola.component>=1.9.0",
     "keboola-csvwriter>=1.0.1",
     "keboola-http-client>=1.0.0",
     "keboola-utils>=1.1.0",
@@ -16,25 +16,24 @@ dependencies = [
     "typeguard>=3.0.2",
 ]
 
-[tool.black]
-line-length = 120
-exclude = '''
-/(
-    \.git
-  | \.venv
-  | venv
-  | env
-  | build
-  | dist
-  | data
-)/
-'''
-
 [dependency-groups]
 dev = [
-    "black>=25.9.0",
-    "datadirtest @ git+https://github.com/keboola/datadirtest.git@feature/vcr-testing",
-    "flake8>=7.3.0",
+    "keboola.datadirtest>=2.0.0",
     "pytest>=9.0.0",
-    "ruff>=0.13.3",
+    "ruff>=0.15.2",
 ]
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+explicit = true
+
+[tool.uv.sources]
+"keboola.component" = { index = "testpypi" }
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+extend-select = ["I", "UP"]

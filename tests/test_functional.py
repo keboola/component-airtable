@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from datadirtest.vcr import VCRDataDirTester, get_test_cases
+from keboola.datadirtest.vcr import VCRDataDirTester, get_test_cases
 
 FUNCTIONAL_DIR = str(Path(__file__).parent / "functional")
 COMPONENT_SCRIPT = str(Path(__file__).parent.parent / "src" / "component.py")

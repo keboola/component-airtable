@@ -127,7 +127,6 @@ jobs:
         run: |
           docker load --input /tmp/${{ env.KBC_DEVELOPERPORTAL_APP }}.tar
           docker image ls -a
-          docker run ${{ env.KBC_DEVELOPERPORTAL_APP }}:latest flake8 . --config=flake8.cfg
           echo "Running functional VCR tests..."
           docker run ${{ env.KBC_DEVELOPERPORTAL_APP }}:latest python -m pytest tests/ --tb=short -q
 
