@@ -152,16 +152,16 @@
         },
         "incremental_loading": {
           "enum": [
-            false,
-            true
+            true,
+            false
           ],
           "type": "boolean",
           "title": "Load Type",
           "default": false,
           "options": {
             "enum_titles": [
-              "Full Load",
-              "Incremental Load"
+              "Incremental Load",
+              "Full Load"
             ]
           },
           "description": "If Full load is used, the destination table will be overwritten every run. If Incremental Load is used, data will be upserted into the destination table.",

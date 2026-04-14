@@ -110,7 +110,7 @@ class Component(ComponentBase):
         table_id: str = params[KEY_TABLE_NAME]
         view_id: Optional[str] = params.get(KEY_VIEW_NAME)
         fields: Optional[List[str]] = params.get(KEY_FIELDS, None)
-        self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: True}).get(
+        self.incremental_destination: bool = params.get(KEY_GROUP_DESTINATION, {KEY_INCREMENTAL_LOAD: False}).get(
             KEY_INCREMENTAL_LOAD
         )
 
